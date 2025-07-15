@@ -1,0 +1,117 @@
+#chat {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 400px;
+    height: 600px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f1f1f1;
+    display: none;
+    z-index: 99999;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  
+  #chat-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 50px;
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  .msg.bot ul {
+
+    margin-block-start: 0px !important;
+    margin-block-end: 0px !important;
+    padding-inline-start: 40px;
+    unicode-bidi: isolate;
+}
+  #chat-window {
+    height: 90%;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    display: flex
+;
+    flex-direction: column;
+}
+  #msg {
+    width: 70%;
+    padding: 10px;
+    font-size: 16px;
+  }
+  
+  #sendBtn {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  .msg {
+    margin-bottom: 1rem;
+    padding: 10px;
+    border-radius: 10px;
+  }
+  
+  .msg.user {
+    background-color: #3b81f6;
+    color: white;
+    align-self: flex-end;
+    text-align: right;
+  }
+  
+  .msg.bot {
+    background-color: #eaffea;
+    color: #2a2627;
+    text-align: left;
+  }
+  
+  .bot-msg-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: green;
+  }
+  
+  .bot-msg-wrapper img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+  }
+  
+  .typing-indicator {
+    display: inline-flex;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #eaffea;
+    border-radius: 10px;
+    align-items: center;
+  }
+  
+  .typing-indicator span {
+    display: block;
+    width: 6px;
+    height: 6px;
+    background: green;
+    border-radius: 50%;
+    animation: blink 1.2s infinite;
+  }
+  
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  
+  @keyframes blink {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.5); }
+  }
+  
