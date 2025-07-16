@@ -1,3 +1,19 @@
+.suggested-button {
+  margin: 5px 5px 0 0;
+  padding: 6px 14px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.suggested-button:hover {
+  background-color: #0056b3;
+}
+
+
 #chat {
     position: fixed;
     bottom: 80px;
@@ -7,7 +23,8 @@
     border: 1px solid #ddd;
     border-radius: 8px;
     background-color: #f1f1f1;
-    display: none;
+    display: flex; /* ADD */
+    flex-direction: column; /* ADD */
     z-index: 99999;
     padding: 16px;
     box-sizing: border-box;
@@ -35,12 +52,46 @@
     padding-inline-start: 40px;
     unicode-bidi: isolate;
 }
+
+#emoji-btn {
+  z-index: 999999;
+  position: relative;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+#msg {
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#sendBtn {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.msg-container {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background-color: #fff;
+  border-top: 1px solid #ddd;
+}
   #chat-window {
     height: 90%;
-    overflow-y: auto;
+    /* overflow-y: auto; */
+    flex: 1 1 auto; /* fills remaining height */
+    overflow-y: auto; /* enable scrolling */
     margin-bottom: 10px;
-    display: flex
-;
+    display: flex;
     flex-direction: column;
 }
   #msg {

@@ -4,12 +4,7 @@ from datetime import datetime
 from db_config import DB_CONFIG
 
 # db_config.py
-DB_CONFIG = {
-    'host': 'localhost',       # Database host
-    'user': 'root',            # Database username
-    'password': '',    # Database password
-    'database': 'saturn'   # Database name
-}
+
 
 def log_chat(user_id, message, sender, intent=None, sales_flag=None, success_flag=None):
     try:
@@ -51,6 +46,25 @@ def log_chat(user_id, message, sender, intent=None, sales_flag=None, success_fla
             cursor.close()
             connection.close()
 
+def get_or_create_user(name, email, phone):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+    user = cursor.fetchone()
+
+    if user:
+        cursor.close()
+        conn.close()
+        return user["id"]
+
+    cursor.execute("INSERT INTO users (name, email, phone) VALUES (%s, %s, %s)", (name, email, phone))
+    conn.commit()
+    user_id = cursor.lastrowid
+
+    cursor.close()
+    conn.close()
+    return user_id
 
 
 def get_connection():
