@@ -20,6 +20,15 @@ def setup():
         context_snapshot TEXT
     )
     """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100),
+            email VARCHAR(100) UNIQUE,
+            phone VARCHAR(20),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
     # Ensure the success_flag column exists in case of schema changes
     cursor.execute("""
