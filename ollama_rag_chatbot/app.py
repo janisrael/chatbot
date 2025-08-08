@@ -452,7 +452,7 @@ LLM_OPTION = "openai"  # Change to "ollama" for local/free option
 
 if LLM_OPTION == "openai":
     # OpenAI Option (requires API key and billing)
-    openai_api_key = os.getenv("OPENAI_API_KEY", "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")
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
     if not openai_api_key:
         raise ValueError("Please set OPENAI_API_KEY environment variable")
     
