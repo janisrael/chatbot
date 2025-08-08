@@ -1,108 +1,548 @@
+# from flask import Flask, request, jsonify, render_template, session, send_from_directory
+# from flask_cors import CORS
+# import os
+# from datetime import datetime
+# import re
+
+# # Updated imports for newer LangChain versions
+# try:
+#     from langchain_chroma import Chroma
+# except ImportError:
+#     from langchain.vectorstores import Chroma
+    
+# from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain.chains import RetrievalQA
+# from langchain.prompts import PromptTemplate
+
+# # App setup
+# app = Flask(__name__)
+# app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")
+# CORS(app)
+
+# # 🎯 Suggested messages for the UI
+# SUGGESTED_MESSAGES = [
+#     "What services do you offer?",
+#     "How can I contact support?",
+#     "What are your business hours?",
+#     "Tell me about your pricing",
+#     "How do I get started?"
+# ]
+
+# # 🔐 LLM Configuration - Choose your option
+# LLM_OPTION = "openai"  # Change to "ollama" for local/free option
+
+# if LLM_OPTION == "openai":
+#     # OpenAI Option (requires API key and billing)
+#     openai_api_key = os.getenv("OPENAI_API_KEY")
+#     if not openai_api_key:
+#         raise ValueError("Please set OPENAI_API_KEY environment variable")
+    
+#     from langchain_openai import ChatOpenAI
+#     llm = ChatOpenAI(
+#         model="gpt-4o-mini",  # Options: gpt-3.5-turbo, gpt-4o-mini, gpt-4o, gpt-4
+#         temperature=0.7,
+#         openai_api_key=openai_api_key
+#     )
+#     print(f"🤖 Using OpenAI model: gpt-4o-mini")
+
+# else:
+#     # Ollama Option (free, runs locally)
+#     try:
+#         from langchain_community.llms import Ollama
+#         llm = Ollama(
+#             model="llama3.1:8b",  # or "llama2", "codellama", "mistral"
+#             temperature=0.7,
+#             base_url="http://localhost:11434"  # Default Ollama URL
+#         )
+#         print(f"🤖 Using Ollama model: llama3.1:8b")
+#     except ImportError:
+#         print("❌ Ollama not available. Install with: pip install langchain-community")
+#         # Fallback to a mock LLM for testing
+#         class MockLLM:
+#             def invoke(self, prompt):
+#                 return "I'm a mock response. Please set up either OpenAI API or Ollama to get real responses."
+#         llm = MockLLM()
+#         print("🤖 Using Mock LLM (for testing only)")
+
+# # 🔍 Embeddings & Vector DB setup
+# embeddings = HuggingFaceEmbeddings()
+# vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+
+# # RAG prompt template
+# template_text = """Use only the info below to answer.
+# If the context is irrelevant, say 'I'm not sure about that.'
+# Always answer in HTML: <br>, <ul>, etc. Never Markdown or JSON.
+
+# Relevant Info:
+# {context}
+
+# User: {question}
+# Staff:"""
+
+# prompt = PromptTemplate(
+#     input_variables=["context", "question"],
+#     template=template_text,
+# )
+
+# retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+# # Create QA chain based on LLM type
+# if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+#     try:
+#         qa_chain = RetrievalQA.from_chain_type(
+#             llm=llm,
+#             chain_type="stuff",
+#             retriever=retriever,
+#             chain_type_kwargs={"prompt": prompt}
+#         )
+#         print("✅ QA Chain created successfully")
+#     except Exception as e:
+#         print(f"❌ QA Chain creation failed: {e}")
+#         qa_chain = None
+# else:
+#     qa_chain = None
+#     print("⚠️ Using mock LLM - QA chain not created")
+
+# # ================================
+# # 🌐 WEB UI ROUTES
+# # ================================
+# @app.route("/")
+# def index():
+#     session.clear()
+#     return render_template("index.html", suggested=SUGGESTED_MESSAGES)
+
+# @app.route("/widget")
+# def widget():
+#     session.clear()
+#     return render_template("widget.html", suggested=SUGGESTED_MESSAGES)
+
+# @app.route("/embed.js")
+# def serve_embed_script():
+#     return send_from_directory("static", "embed.js")
+
+# # ================================
+# # 📦 CHAT ENDPOINT
+# # ================================
+# @app.route("/chat", methods=["POST"])
+# def chat():
+#     try:
+#         data = request.json
+#         user_input = data.get("message")
+#         user_id = data.get("user_id", "anon")
+#         name = data.get("name", "visitor")
+
+#         if not user_input:
+#             return jsonify({"error": "No message provided"}), 400
+
+#         # Enhanced prompt with user context
+#         enhanced_query = (
+#             f"You are Bobot AI, a friendly assistant at SourceSelect.ca. "
+#             f"You are helping a user named {name}. "
+#             f"Always answer in raw HTML (e.g., <br>, <ul>), no Markdown. "
+#             f"Always end your message with a helpful follow-up question. "
+#             f"Question: {user_input}"
+#         )
+
+#         # Use the QA chain to get response
+#         if qa_chain and hasattr(llm, 'invoke'):
+#             # For proper LangChain LLMs with QA chain
+#             response = qa_chain.invoke({"query": enhanced_query})
+#             reply = response["result"].strip().replace("\n", "<br>")
+#         else:
+#             # For mock LLM or when QA chain failed - manual RAG
+#             docs = retriever.get_relevant_documents(user_input)
+#             context = "\n\n".join(doc.page_content for doc in docs)
+            
+#             full_prompt = template_text.format(context=context, question=user_input)
+#             full_prompt += f"\n\nYou are Bobot AI helping {name}. Always end with a follow-up question."
+            
+#             if hasattr(llm, 'invoke'):
+#                 reply = llm.invoke(full_prompt)
+#             else:
+#                 reply = f"Mock response for: {user_input}<br><br>What else would you like to know?"
+        
+#         # Log the conversation
+#         log_chat(user_id, user_input, "user")
+#         log_chat(user_id, reply, "bot")
+        
+#         return jsonify({"response": reply})
+
+#     except Exception as e:
+#         print(f"Chat error: {e}")
+#         return jsonify({"response": "Sorry, I ran into an error. Please try again."}), 500
+
+# # ================================
+# # 📄 TEMPLATE ENDPOINT (Returns current RAG prompt)
+# # ================================
+# @app.route("/template", methods=["GET"])
+# def get_template():
+#     return jsonify({"template": template_text})
+
+# # ================================
+# # 🧠 UPDATE FAQ VECTOR DB
+# # ================================
+# @app.route("/update_faq", methods=["POST"])
+# def update_faq():
+#     try:
+#         from langchain_community.document_loaders import TextLoader
+#         from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+#         # Check if FAQ file exists
+#         faq_file = "data/faq.txt"
+#         if not os.path.exists(faq_file):
+#             return jsonify({"error": f"FAQ file not found at {faq_file}"}), 404
+
+#         # Load your updated FAQ or content
+#         loader = TextLoader(faq_file)
+#         documents = loader.load()
+
+#         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+#         chunks = splitter.split_documents(documents)
+
+#         # Update the vector store
+#         global vectorstore, retriever, qa_chain
+#         vectorstore = Chroma.from_documents(
+#             chunks, 
+#             embedding=embeddings, 
+#             persist_directory="./chroma_db"
+#         )
+#         vectorstore.persist()
+        
+#         # Update retriever and QA chain
+#         retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        
+#         if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+#             try:
+#                 qa_chain = RetrievalQA.from_chain_type(
+#                     llm=llm,
+#                     chain_type="stuff",
+#                     retriever=retriever,
+#                     chain_type_kwargs={"prompt": prompt}
+#                 )
+#             except Exception as e:
+#                 print(f"QA chain update failed: {e}")
+#                 qa_chain = None
+        
+#         return jsonify({"status": "FAQ updated successfully"})
+#     except Exception as e:
+#         print(f"FAQ update error: {e}")
+#         return jsonify({"error": f"Failed to update FAQ: {str(e)}"}), 500
+
+# # ================================
+# # 🔍 HEALTH CHECK ENDPOINT
+# # ================================
+# @app.route("/health", methods=["GET"])
+# def health_check():
+#     try:
+#         # Test vector store
+#         test_docs = retriever.get_relevant_documents("test")
+#         return jsonify({
+#             "status": "healthy",
+#             "vectorstore_docs": len(test_docs),
+#             "llm_model": llm.model_name if hasattr(llm, 'model_name') else "unknown",
+#             "llm_option": LLM_OPTION
+#         })
+#     except Exception as e:
+#         return jsonify({"status": "unhealthy", "error": str(e)}), 500
+
+# # ================================
+# # 💬 Chat Logging (Enhanced)
+# # ================================
+# def log_chat(user_id, message, sender):
+#     try:
+#         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#         # Escape commas and quotes in message for CSV safety
+#         clean_message = message.replace('"', '""').replace('\n', ' ').replace('\r', ' ')
+#         log_entry = f'"{now}","{user_id}","{sender}","{clean_message}"\n'
+        
+#         # Create logs directory if it doesn't exist
+#         os.makedirs("logs", exist_ok=True)
+        
+#         with open("logs/chat_logs.csv", "a", encoding="utf-8") as f:
+#             f.write(log_entry)
+#     except Exception as e:
+#         print(f"Logging error: {e}")
+
+# # ================================
+# # 🧪 Run
+# # ================================
+# if __name__ == "__main__":
+#     # Create necessary directories
+#     os.makedirs("./chroma_db", exist_ok=True)
+#     os.makedirs("./data", exist_ok=True)
+#     os.makedirs("./logs", exist_ok=True)
+    
+#     print("🤖 Starting Flask RAG Chatbot...")
+#     print(f"📊 Vector store location: ./chroma_db")
+#     print(f"📝 FAQ file expected at: ./data/faq.txt")
+#     print(f"📋 Logs will be saved to: ./logs/chat_logs.csv")
+    
+#     app.run(host='0.0.0.0', port=5000, debug=True)
+# =====
+
+# from flask import Flask, request, jsonify, render_template, session, send_from_directory
+# from flask_cors import CORS
+# import os
+# from datetime import datetime
+# import re
+
+# # Updated imports for dashboard functionality
+# try:
+#     from langchain_chroma import Chroma
+# except ImportError:
+#     from langchain.vectorstores import Chroma
+    
+    
+# from langchain_huggingface import HuggingFaceEmbeddings
+# from langchain.chains import RetrievalQA
+# from langchain.prompts import PromptTemplate
+# from werkzeug.utils import secure_filename
+# import json
+
+# # App setup
+# app = Flask(__name__)
+# app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")
+# app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+# app.config['UPLOAD_FOLDER'] = 'uploads'
+# CORS(app)
+
+# # Create upload directory
+# os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# # Allowed file extensions
+# ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'csv'}
+
+# # 🎯 Suggested messages for the UI
+# SUGGESTED_MESSAGES = [
+#     "What services do you offer?",
+#     "How can I contact support?",
+#     "What are your business hours?",
+#     "Tell me about your pricing",
+#     "How do I get started?"
+# ]
+
+# # 🔐 LLM Configuration - Choose your option
+# LLM_OPTION = "openai"  # Change to "ollama" for local/free option
+
+# if LLM_OPTION == "openai":
+#     # OpenAI Option (requires API key and billing)
+#     openai_api_key = os.getenv("OPENAI_API_KEY")
+#     if not openai_api_key:
+#         raise ValueError("Please set OPENAI_API_KEY environment variable")
+    
+#     from langchain_openai import ChatOpenAI
+#     llm = ChatOpenAI(
+#         model="gpt-4o-mini",  # Options: gpt-3.5-turbo, gpt-4o-mini, gpt-4o, gpt-4
+#         temperature=0.7,
+#         openai_api_key=openai_api_key
+#     )
+#     print(f"🤖 Using OpenAI model: gpt-4o-mini")
+
+# else:
+#     # Ollama Option (free, runs locally)
+#     try:
+#         from langchain_community.llms import Ollama
+#         llm = Ollama(
+#             model="llama3.1:8b",  # or "llama2", "codellama", "mistral"
+#             temperature=0.7,
+#             base_url="http://localhost:11434"  # Default Ollama URL
+#         )
+#         print(f"🤖 Using Ollama model: llama3.1:8b")
+#     except ImportError:
+#         print("❌ Ollama not available. Install with: pip install langchain-community")
+#         # Fallback to a mock LLM for testing
+#         class MockLLM:
+#             def invoke(self, prompt):
+#                 return "I'm a mock response. Please set up either OpenAI API or Ollama to get real responses."
+#         llm = MockLLM()
+#         print("🤖 Using Mock LLM (for testing only)")
+
+# # 🔍 Embeddings & Vector DB setup
+# embeddings = HuggingFaceEmbeddings()
+# vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+
+# # RAG prompt template
+# template_text = """You are Bobot AI, a helpful and friendly assistant for SourceSelect.ca.
+
+# INSTRUCTIONS:
+# - Use ONLY the information provided in the "Relevant Info" section below
+# - If the context doesn't contain relevant information, say "I'm not sure about that, but I'd be happy to help you find the right person to contact."
+# - Always respond in HTML format (use <br> for line breaks, <ul><li> for lists, <strong> for emphasis)
+# - Be conversational and helpful
+# - Always end your response with a relevant follow-up question
+# - Keep responses concise but informative
+
+# Relevant Info:
+# {context}
+
+# User Question: {question}
+
+# Bobot AI Response:"""
+
+# prompt = PromptTemplate(
+#     input_variables=["context", "question"],
+#     template=template_text,
+# )
+
+# retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+# # Create QA chain based on LLM type
+# if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+#     try:
+#         qa_chain = RetrievalQA.from_chain_type(
+#             llm=llm,
+#             chain_type="stuff",
+#             retriever=retriever,
+#             chain_type_kwargs={"prompt": prompt}
+#         )
+#         print("✅ QA Chain created successfully")
+#     except Exception as e:
+#         print(f"❌ QA Chain creation failed: {e}")
+#         qa_chain = None
+# else:
+#     qa_chain = None
+#     print("⚠️ Using mock LLM - QA chain not created")
+
+# ================================
+# 🌐 WEB UI ROUTES
+# ================================
+
 from flask import Flask, request, jsonify, render_template, session, send_from_directory
-import requests, smtplib, time
-from email.mime.text import MIMEText
-from difflib import get_close_matches
-from langchain_community.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from sales_intent_classifier import classify_message
-from db_model import log_chat, get_connection
 from flask_cors import CORS
-import plotly.express as px
-import pandas as pd
-from db_model import get_or_create_user
+import os
+from datetime import datetime
+import re
 
+# Updated imports for dashboard functionality
+try:
+    from langchain_community.vectorstores import Chroma  # ✅ Correct import
+except ImportError:
+    from langchain.vectorstores import Chroma  # Fallback (legacy)
+
+from langchain_community.embeddings import HuggingFaceEmbeddings  # ✅ Updated
+from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
+from werkzeug.utils import secure_filename
+import json
+
+# App setup
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "admin123")
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
 CORS(app)
-app.secret_key = "your_secret_key"
 
-# Embeddings + RAG model setup
-embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-MODEL = "llama3"
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
+# Create upload directory
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Suggested buttons
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'csv'}
+
+# 🎯 Suggested messages for the UI
 SUGGESTED_MESSAGES = [
     "What services do you offer?",
-    "Can you help me with branding?",
-    "How do I start a project?",
-    "Who is the CEO of SourceSelect?",
-    "Can you give me your address?",
-    "Do you offer web development?",
+    "How can I contact support?",
+    "What are your business hours?",
+    "Tell me about your pricing",
+    "How do I get started?"
 ]
 
-# ------------------- UTILITIES -------------------
+# 🔐 LLM Configuration - Choose your option
+LLM_OPTION = "openai"  # Change to "ollama" for local/free option
 
-def increment_user_interaction():
-    session["msg_count"] = session.get("msg_count", 0) + 1
-    return session["msg_count"]
-
-def check_constraints(text):
-    restricted = ["politics", "religion", "training data"]
-    return next((f"Sorry, I can't discuss that. Let’s stick to support-related topics." 
-                 for word in restricted if word in text.lower()), None)
-
-def retrieve_knowledge(query):
-    db = Chroma(persist_directory="./db", embedding_function=embedding_model)
-    results = db.similarity_search(query, k=3)
-    if not results or all(doc.page_content.strip() == "" for doc in results):
-        return None
-    return "\n".join([doc.page_content for doc in results])
-
-def generate_rag_response(context, user_input, name, user_id):
-    prompt = (
-        f"You are Bobot AI, a helpful assistant for SourceSelect.ca.\n\n"
-        f"You're assisting a user named {name or 'a visitor'}.\n\n"
-        "Always respond in raw HTML — use for line breaks, <ul><li></li></ul> for lists.\n"
-        "Never include Markdown or JSON formatting.\n\n"
-        "Only answer based on the information in 'Relevant Info'.\n\n"
-        f"Relevant Info:\n{context}\n\nUser: {user_input}\nStaff:"
-        " Then, always end with a relevant follow-up question to keep the conversation going."
+if LLM_OPTION == "openai":
+    # OpenAI Option (requires API key and billing)
+    openai_api_key = os.getenv("OPENAI_API_KEY", "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")
+    if not openai_api_key:
+        raise ValueError("Please set OPENAI_API_KEY environment variable")
+    
+    from langchain_openai import ChatOpenAI
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",  # Options: gpt-3.5-turbo, gpt-4o-mini, gpt-4o, gpt-4
+        temperature=1,
+        openai_api_key=openai_api_key
     )
+    print(f"🤖 Using OpenAI model: gpt-4o-mini")
 
-    response = requests.post(OLLAMA_API_URL, json={
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False
-    })
-
-    if response.ok:
-        answer = response.json()["response"].strip().replace("\n", "<br>")
-        log_chat(user_id, answer, "bot")
-        return jsonify({
-            "response": f"{answer}<br>Would you like to know more or explore something else?"
-        })
-    else:
-        return jsonify({"response": "Error contacting the AI model."}), 500
-
-def send_lead_email(name, email, phone, message):
-    TO = "janisatssm@gmail.com"
-    FROM = "janfrancisisrael@gmail.com"
-    SUBJECT = "New Lead from Chatbot"
-    PASSWORD = "pwvn wxdk vekx glco"
-
-    body = f"""
-    New lead from chatbot:
-
-    Name: {name or 'N/A'}
-    Email: {email or 'N/A'}
-    Phone: {phone or 'N/A'}
-    Message: {message}
-    """
-
-    msg = MIMEText(body)
-    msg["Subject"] = SUBJECT
-    msg["From"] = FROM
-    msg["To"] = TO
-
+else:
+    # Ollama Option (free, runs locally)
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(FROM, PASSWORD)
-            server.sendmail(FROM, [TO], msg.as_string())
-            print("Lead email sent.")
-    except Exception as e:
-        print("Failed to send lead email:", e)
+        from langchain_community.llms import Ollama
+        llm = Ollama(
+            model="llama3.1:8b",  # or "llama2", "codellama", "mistral"
+            temperature=0.7,
+            base_url="http://localhost:11434"  # Default Ollama URL
+        )
+        print(f"🤖 Using Ollama model: llama3.1:8b")
+    except ImportError:
+        print("❌ Ollama not available. Install with: pip install langchain-community")
+        # Fallback to a mock LLM for testing
+        class MockLLM:
+            def invoke(self, prompt):
+                return "I'm a mock response. Please set up either OpenAI API or Ollama to get real responses."
+        llm = MockLLM()
+        print("🤖 Using Mock LLM (for testing only)")
 
-# ------------------- ROUTES -------------------
+# 🔍 Embeddings & Vector DB setup
+embeddings = HuggingFaceEmbeddings()
+
+# ✅ Chroma vector store (no `.persist()` needed)
+vectorstore = Chroma(
+    persist_directory="./chroma_db",
+    embedding_function=embeddings
+)
+
+# RAG prompt template
+template_text = """
+You are Bob, a real human virtual assistant for SourceSelect.ca.
+
+Your job is to help users with their questions about SourceSelect.ca and its services. Always be polite, helpful, and conversational—just like a friendly and attentive human agent.
+
+INSTRUCTIONS:
+- Vary your greetings and responses to avoid sounding repetitive or robotic.
+- Reference the user's specific question in your answer.
+- Use ONLY the information provided in the "Relevant Info" section below.
+- If you don't know the answer or the information isn't available, respond with a polite and varied fallback such as:
+  "That's a great question! I don't have the details on that right now, but I can help connect you to the right person."
+  or
+  "I'm not sure about that, but I can help you get in touch with someone who knows more!"
+- Only ask follow-up questions if they make sense and feel natural.
+- Respond in HTML format (use <br> for line breaks, <ul><li> for lists, <strong> for emphasis).
+- Keep your tone friendly and concise.
+- Always finish with a relevant, human-sounding follow-up or offer to help further.
+
+Relevant Info:
+{context}
+
+User Question: {question}
+
+Bob's Response:
+"""
+
+prompt = PromptTemplate(
+    input_variables=["context", "question"],
+    template=template_text,
+)
+
+retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+
+# Create QA chain based on LLM type
+if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+    try:
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            chain_type_kwargs={"prompt": prompt}
+        )
+        print("✅ QA Chain created successfully")
+    except Exception as e:
+        print(f"❌ QA Chain creation failed: {e}")
+        qa_chain = None
+else:
+    qa_chain = None
+    print("⚠️ Using mock LLM - QA chain not created")
+
 
 @app.route("/")
 def index():
@@ -118,145 +558,447 @@ def widget():
 def serve_embed_script():
     return send_from_directory("static", "embed.js")
 
-@app.route("/analytics_data")
-def analytics_data():
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT timestamp, sales_flag FROM chat_logs ORDER BY timestamp ASC")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
 
-    return jsonify({
-        "timestamps": [row["timestamp"].strftime('%Y-%m-%d %H:%M:%S') for row in rows],
-        "sales_flags": [int(row["sales_flag"] or 0) for row in rows],
-    })
+# ================================
+# 📊 DASHBOARD API ENDPOINTS
+# ================================
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route("/analytics")
-def analytics():
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM chat_logs ORDER BY timestamp DESC")
-    messages = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return render_template("analytics.html", messages=messages)
+@app.route("/api/upload", methods=["POST"])
+def upload_file():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        if not allowed_file(file.filename):
+            return jsonify({"error": "File type not allowed"}), 400
+        
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # Process the file
+        success = process_uploaded_file(filepath, filename)
+        
+        if success:
+            return jsonify({"message": f"File {filename} processed successfully"})
+        else:
+            return jsonify({"error": "Failed to process file"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
+@app.route("/api/crawl", methods=["POST"])
+def crawl_url():
+    try:
+        data = request.json
+        url = data.get('url')
+        max_pages = data.get('max_pages', 10)
+        
+        if not url:
+            return jsonify({"error": "No URL provided"}), 400
+        
+        # Process the URL
+        success = process_url(url, max_pages)
+        
+        if success:
+            return jsonify({"message": f"URL {url} crawled successfully"})
+        else:
+            return jsonify({"error": "Failed to crawl URL"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/prompt", methods=["GET", "POST"])
+def manage_prompt():
+    try:
+        if request.method == "GET":
+            return jsonify({"prompt": template_text})
+        
+        elif request.method == "POST":
+            data = request.json
+            new_prompt = data.get('prompt')
+            
+            if not new_prompt:
+                return jsonify({"error": "No prompt provided"}), 400
+            
+            # Update the global prompt
+            success = update_prompt(new_prompt)
+            
+            if success:
+                return jsonify({"message": "Prompt updated successfully"})
+            else:
+                return jsonify({"error": "Failed to update prompt"}), 500
+                
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/knowledge-stats", methods=["GET"])
+def knowledge_stats():
+    try:
+        # Get vector store statistics
+        test_docs = retriever.get_relevant_documents("test", k=10000)
+        
+        stats = {
+            "total_documents": len(test_docs),
+            "vector_store_path": "./chroma_db",
+            "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+            "llm_model": llm.model_name if hasattr(llm, 'model_name') else "unknown",
+            "llm_option": LLM_OPTION
+        }
+        
+        # Get uploaded files
+        uploaded_files = []
+        if os.path.exists(app.config['UPLOAD_FOLDER']):
+            for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                if os.path.isfile(filepath):
+                    stat = os.stat(filepath)
+                    uploaded_files.append({
+                        "name": filename,
+                        "size": stat.st_size,
+                        "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+        
+        stats["uploaded_files"] = uploaded_files
+        return jsonify(stats)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ================================
+# 🔧 HELPER FUNCTIONS
+# ================================
+def process_uploaded_file(filepath, filename):
+    try:
+        from langchain_community.document_loaders import PyPDFLoader, TextLoader, CSVLoader
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        
+        # Determine file type and load accordingly
+        file_ext = filename.lower().split('.')[-1]
+        
+        if file_ext == 'pdf':
+            loader = PyPDFLoader(filepath)
+        elif file_ext == 'csv':
+            loader = CSVLoader(filepath)
+        else:  # txt, doc, etc.
+            loader = TextLoader(filepath, encoding='utf-8')
+        
+        documents = loader.load()
+        
+        # Split documents into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        chunks = text_splitter.split_documents(documents)
+        
+        # Add metadata
+        for chunk in chunks:
+            chunk.metadata['source_file'] = filename
+            chunk.metadata['upload_time'] = datetime.now().isoformat()
+        
+        # Add to vector store
+        global vectorstore, retriever, qa_chain
+        
+        # Create new vector store with existing + new documents
+        existing_docs = []
+        try:
+            existing_docs = retriever.get_relevant_documents("", k=1000)
+        except:
+            pass
+        
+        all_docs = existing_docs + chunks
+        
+        vectorstore = Chroma.from_documents(
+            all_docs,
+            embedding=embeddings,
+            persist_directory="./chroma_db"
+        )
+        vectorstore.persist()
+        
+        # Update retriever and QA chain
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        update_qa_chain()
+        
+        return True
+        
+    except Exception as e:
+        print(f"File processing error: {e}")
+        return False
+
+def process_url(url, max_pages=10):
+    try:
+        from langchain_community.document_loaders import WebBaseLoader
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        
+        # Simple web scraping
+        loader = WebBaseLoader([url])
+        documents = loader.load()
+        
+        # Split documents into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
+        )
+        chunks = text_splitter.split_documents(documents)
+        
+        # Add metadata
+        for chunk in chunks:
+            chunk.metadata['source_url'] = url
+            chunk.metadata['crawl_time'] = datetime.now().isoformat()
+        
+        # Add to vector store
+        global vectorstore, retriever, qa_chain
+        
+        # Get existing documents
+        existing_docs = []
+        try:
+            existing_docs = retriever.get_relevant_documents("", k=1000)
+        except:
+            pass
+        
+        all_docs = existing_docs + chunks
+        
+        vectorstore = Chroma.from_documents(
+            all_docs,
+            embedding=embeddings,
+            persist_directory="./chroma_db"
+        )
+        vectorstore.persist()
+        
+        # Update retriever and QA chain
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        update_qa_chain()
+        
+        return True
+        
+    except Exception as e:
+        print(f"URL processing error: {e}")
+        return False
+
+def update_prompt(new_prompt):
+    try:
+        global template_text, prompt, qa_chain
+        
+        template_text = new_prompt
+        prompt = PromptTemplate(
+            input_variables=["context", "question"],
+            template=template_text,
+        )
+        
+        # Save prompt to file
+        os.makedirs("config", exist_ok=True)
+        with open("config/prompt.txt", "w", encoding="utf-8") as f:
+            f.write(new_prompt)
+        
+        # Update QA chain
+        update_qa_chain()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Prompt update error: {e}")
+        return False
+
+def update_qa_chain():
+    global qa_chain
+    if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+        try:
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                chain_type="stuff",
+                retriever=retriever,
+                chain_type_kwargs={"prompt": prompt}
+            )
+        except Exception as e:
+            print(f"QA chain update failed: {e}")
+            qa_chain = None
+
+# Load saved prompt if exists
+def load_saved_prompt():
+    try:
+        if os.path.exists("config/prompt.txt"):
+            with open("config/prompt.txt", "r", encoding="utf-8") as f:
+                return f.read()
+    except:
+        pass
+    return None
+
+# Load saved prompt at startup
+saved_prompt = load_saved_prompt()
+if saved_prompt:
+    template_text = saved_prompt
+    prompt = PromptTemplate(
+        input_variables=["context", "question"],
+        template=template_text,
+    )
+
+# ================================
+# 📦 CHAT ENDPOINT
+# ================================
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json or {}
-    user_input = data.get("message")
-    initial = data.get("initial", False)
-    name = data.get("name")
-    phone = data.get("phone")
-    email = data.get("email")
+    try:
+        data = request.json
+        user_input = data.get("message")
+        user_id = data.get("user_id", "anon")
+        name = data.get("name", "visitor")
 
-    if not user_input and not initial:
-        return jsonify({"response": "No input provided."}), 400
+        if not user_input:
+            return jsonify({"error": "No message provided"}), 400
 
-    if name and email:
-        session["user_name"] = name
-        session["user_email"] = email
-        session["user_phone"] = phone
-        user_db_id = get_or_create_user(name, email, phone)
-        session["user_db_id"] = user_db_id
+        # Enhanced prompt with user context
+        enhanced_query = (
+            f"You are Bobot AI, a friendly assistant at SourceSelect.ca. "
+            f"You are helping a user named {name}. "
+            f"Always answer in raw HTML (e.g., <br>, <ul>), no Markdown. "
+            f"Always end your message with a helpful follow-up question. "
+            f"Question: {user_input}"
+        )
 
-    # user_id = session.get("user_db_id") or session.get("user_email") or request.remote_addr
+        # Use the QA chain to get response
+        if qa_chain and hasattr(llm, 'invoke'):
+            # For proper LangChain LLMs with QA chain
+            response = qa_chain.invoke({"query": enhanced_query})
+            reply = response["result"].strip().replace("\n", "<br>")
+        else:
+            # For mock LLM or when QA chain failed - manual RAG
+            docs = retriever.get_relevant_documents(user_input)
+            context = "\n\n".join(doc.page_content for doc in docs)
+            
+            full_prompt = template_text.format(context=context, question=user_input)
+            full_prompt += f"\n\nYou are Bobot AI helping {name}. Always end with a follow-up question."
+            
+            if hasattr(llm, 'invoke'):
+                reply = llm.invoke(full_prompt)
+            else:
+                reply = f"Mock response for: {user_input}<br><br>What else would you like to know?"
+        
+        # Log the conversation
+        log_chat(user_id, user_input, "user")
+        log_chat(user_id, reply, "bot")
+        
+        return jsonify({"response": reply})
 
-    user_id = session.get("user_email") or request.remote_addr
+    except Exception as e:
+        print(f"Chat error: {e}")
+        return jsonify({"response": "Sorry, I ran into an error. Please try again."}), 500
 
-    msg_count = increment_user_interaction()
+# ================================
+# 📄 TEMPLATE ENDPOINT (Returns current RAG prompt)
+# ================================
+@app.route("/template", methods=["GET"])
+def get_template():
+    return jsonify({"template": template_text})
 
-    log_chat(user_id, user_input, "user")
+# ================================
+# 🧠 UPDATE FAQ VECTOR DB
+# ================================
+@app.route("/update_faq", methods=["POST"])
+def update_faq():
+    try:
+        from langchain_community.document_loaders import TextLoader
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-    if initial and not session.get("greeting_sent"):
-        session["greeting_sent"] = True
+        # Check if FAQ file exists
+        faq_file = "data/faq.txt"
+        if not os.path.exists(faq_file):
+            return jsonify({"error": f"FAQ file not found at {faq_file}"}), 404
+
+        # Load your updated FAQ or content
+        loader = TextLoader(faq_file)
+        documents = loader.load()
+
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = splitter.split_documents(documents)
+
+        # Update the vector store
+        global vectorstore, retriever, qa_chain
+        vectorstore = Chroma.from_documents(
+            chunks, 
+            embedding=embeddings, 
+            persist_directory="./chroma_db"
+        )
+        vectorstore.persist()
+        
+        # Update retriever and QA chain
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+        
+        if LLM_OPTION == "openai" or hasattr(llm, 'invoke'):
+            try:
+                qa_chain = RetrievalQA.from_chain_type(
+                    llm=llm,
+                    chain_type="stuff",
+                    retriever=retriever,
+                    chain_type_kwargs={"prompt": prompt}
+                )
+            except Exception as e:
+                print(f"QA chain update failed: {e}")
+                qa_chain = None
+        
+        return jsonify({"status": "FAQ updated successfully"})
+    except Exception as e:
+        print(f"FAQ update error: {e}")
+        return jsonify({"error": f"Failed to update FAQ: {str(e)}"}), 500
+
+# ================================
+# 🔍 HEALTH CHECK ENDPOINT
+# ================================
+@app.route("/health", methods=["GET"])
+def health_check():
+    try:
+        # Test vector store
+        test_docs = retriever.get_relevant_documents("test")
         return jsonify({
-            "response": f"I'm happy to help! Hi {name or 'there'}! What can I help you with today?"
+            "status": "healthy",
+            "vectorstore_docs": len(test_docs),
+            "llm_model": llm.model_name if hasattr(llm, 'model_name') else "unknown",
+            "llm_option": LLM_OPTION
         })
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 500
 
-    if session.get("awaiting_sales_confirm"):
-        session.pop("awaiting_sales_confirm")
-        if "yes" in user_input.lower():
-            return jsonify({
-                "response": "Sorry, no sales rep is online. Would you like to email us the details?",
-                "suggested_buttons": ["Yes", "No"]
-            })
-        return jsonify({"response": "Alright! I'm here to help with anything else you need."})
+# ================================
+# 💬 Chat Logging (Enhanced)
+# ================================
+def log_chat(user_id, message, sender):
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Escape commas and quotes in message for CSV safety
+        clean_message = message.replace('"', '""').replace('\n', ' ').replace('\r', ' ')
+        log_entry = f'"{now}","{user_id}","{sender}","{clean_message}"\n'
+        
+        # Create logs directory if it doesn't exist
+        os.makedirs("logs", exist_ok=True)
+        
+        with open("logs/chat_logs.csv", "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception as e:
+        print(f"Logging error: {e}")
 
-    # FAQ Matching
-    FAQ_RESPONSES = {
-        "what is sourceselect": "SourceSelect is a digital solutions agency offering web development, branding, and design services.",
-        "how can i contact sourceselect": "You can contact us via email at <b>hello@sourceselect.ca</b> or call us at <b>(123) 456-7890</b>.",
-        "what services do you offer": "We offer web design, branding, SEO, and custom development services tailored for your business.",
-        "can you help with branding": "Absolutely! We offer full branding packages including logos, color schemes, and brand strategy.",
-        "do you offer web development": "Yes, we specialize in responsive and scalable websites built with the latest technologies."
-    }
-
-    normalized_input = user_input.lower().strip().replace("?", "")
-    faq_keys = list(FAQ_RESPONSES.keys())
-
-    for key, reply in FAQ_RESPONSES.items():
-        if key in normalized_input:
-            final_reply = f"{reply}<br><br>Can I help you with anything else?"
-            log_chat(user_id, final_reply, "bot", "faq", 0)
-            return jsonify({"response": final_reply})
-
-    from difflib import get_close_matches
-    close_match = get_close_matches(normalized_input, faq_keys, n=1, cutoff=0.75)
-    if close_match:
-        matched_key = close_match[0]
-        reply = FAQ_RESPONSES[matched_key]
-        final_reply = f"{reply}<br><br>Can I help you with anything else?"
-        log_chat(user_id, final_reply, "bot", "faq", 0)
-        return jsonify({"response": final_reply})
-
-    # Other logic
-    intent = classify_message(user_input)
-    sales_flag = 1 if intent == "interest" else 0
-
-    if intent == "interest" and not session.get("prospect_prompted"):
-        session["prospect_prompted"] = True
-        session["awaiting_sales_confirm"] = True
-        send_lead_email(session.get("user_name"), session.get("user_email"), session.get("user_phone"), user_input)
-        bot_reply = "Thanks for your interest! Would you like to chat with our <b>sales representative</b>?"
-        log_chat(user_id, bot_reply, "bot", intent, sales_flag)
-        return jsonify({
-            "response": bot_reply,
-            "suggested_buttons": ["Yes", "No"]
-        })
-
-    if intent == "inquiry":
-        session["inquiry_count"] = session.get("inquiry_count", 0) + 1
-        if session["inquiry_count"] > 1:
-            context = retrieve_knowledge(user_input)
-            if context:
-                return generate_rag_response(context, user_input, name, user_id)
-            return jsonify({"response": "Sorry, I can only answer questions about SourceSelect and the information I've been provided."})
-
-        bot_reply = "I can help with pricing or package options. Could you tell me more about your needs?"
-        log_chat(user_id, bot_reply, "bot", intent)
-        return jsonify({"response": bot_reply})
-
-    if intent == "objection":
-        bot_reply = "That's totally understandable. Let me know if you'd like more info or a free consultation."
-        log_chat(user_id, bot_reply, "bot", intent)
-        return jsonify({"response": bot_reply})
-
-    blocked = check_constraints(user_input)
-    if blocked:
-        return jsonify({"response": blocked})
-
-    context = retrieve_knowledge(user_input)
-    if not context:
-        return jsonify({
-            "response": "Sorry, I can only answer questions about SourceSelect and the information I've been provided."
-        })
-
-    return generate_rag_response(context, user_input, name, user_id)
-
-
-# ------------------- RUN -------------------
-
+# ================================
+# 🧪 Run
+# ================================
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    # Create necessary directories
+    os.makedirs("./chroma_db", exist_ok=True)
+    os.makedirs("./data", exist_ok=True)
+    os.makedirs("./logs", exist_ok=True)
+    
+    print("🤖 Starting Flask RAG Chatbot...")
+    print(f"📊 Vector store location: ./chroma_db")
+    print(f"📝 FAQ file expected at: ./data/faq.txt")
+    print(f"📋 Logs will be saved to: ./logs/chat_logs.csv")
+    
+    app.run(host='0.0.0.0', port=5000, debug=True)

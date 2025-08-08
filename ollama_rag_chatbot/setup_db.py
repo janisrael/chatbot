@@ -19,7 +19,26 @@ def setup():
         intent VARCHAR(50), 
         context_snapshot TEXT
     )
+                   
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS conversation_nodes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            convo_id VARCHAR(64),
+            node_id INT,
+            parent_id INT,
+            user_id VARCHAR(255),
+            message TEXT,
+            sender VARCHAR(10),
+            topic VARCHAR(100),
+            intent VARCHAR(100),
+            sales_flag BOOLEAN,
+            success_flag BOOLEAN,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,

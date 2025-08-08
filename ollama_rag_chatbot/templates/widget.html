@@ -1,47 +1,291 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>SourceSelect Chat Widget</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-      width: 100%;
-      height: 100%;
-    }
-    /* Reuse your chatbot UI styles here */
-    /* Example styles for chat window */
-    #chat {
-      height: 400px;
-      overflow-y: auto;
-      background: #f1f1f1;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-    }
-    .msg {
-      margin-bottom: 1rem;
-    }
-    .user {
-      color: blue;
-    }
-    .bot {
-      color: green;
-    }
-    #msg {
-      width: 70%;
-      padding: 15px;
-      font-size: 18px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bobot AI Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            height: 100vh;
+        }
+
+        .widget-container {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .widget-header {
+            background: linear-gradient(135deg, #637ffa 0%, #4d6dff 100%);
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .widget-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            max-height: 100%;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .message.bot .message-content {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 3px;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 3px;
+        }
+
+        .widget-input {
+            display: flex;
+            padding: 12px;
+            background: white;
+            border-top: 1px solid #eee;
+            gap: 8px;
+        }
+
+        #widgetMessageInput {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 18px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        #widgetMessageInput:focus {
+            border-color: #667eea;
+        }
+
+        #widgetSendBtn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 18px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #widgetSendBtn:hover {
+            background: #5a6fd8;
+        }
+
+        #widgetSendBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #e9ecef;
+            border-radius: 12px;
+            border-bottom-left-radius: 3px;
+            max-width: 80%;
+            margin-bottom: 12px;
+            font-size: 12px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #666;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-3px); }
+        }
+
+        .powered-by {
+            text-align: center;
+            padding: 8px;
+            font-size: 10px;
+            color: #888;
+            border-top: 1px solid #eee;
+        }
+    </style>
 </head>
 <body>
-  <!-- Your chat UI here -->
-  <script src="https://cdn.jsdelivr.net/npm/emoji-button@4.6.4/dist/emoji-button.js"></script>
+    <div class="widget-container">
+        <div class="widget-header">
+            Chat with Bobot AI
+        </div>
+        
+        <div class="widget-messages" id="widgetMessages">
+            <div class="message bot">
+                <div class="message-content">
+                    Hi! I'm here to help you with SourceSelect.ca. What can I assist you with?
+                </div>
+            </div>
+        </div>
 
+        <div class="typing-indicator" id="widgetTypingIndicator">
+            <span>Typing</span>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
 
- <script src="http://localhost:5000/embed.js" defer></script>
+        <div class="widget-input">
+            <input type="text" id="widgetMessageInput" placeholder="Ask me anything..." maxlength="300">
+            <button id="widgetSendBtn" onclick="sendWidgetMessage()">Send</button>
+        </div>
+
+        <div class="powered-by">
+            Powered by SourceSelect.ca
+        </div>
+    </div>
+
+    <script>
+        const widgetMessages = document.getElementById('widgetMessages');
+        const widgetMessageInput = document.getElementById('widgetMessageInput');
+        const widgetSendBtn = document.getElementById('widgetSendBtn');
+        const widgetTypingIndicator = document.getElementById('widgetTypingIndicator');
+
+        // Generate random user ID for session
+        const widgetUserId = 'widget_' + Math.random().toString(36).substr(2, 9);
+        const widgetUserName = 'Website Visitor';
+
+        widgetMessageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendWidgetMessage();
+            }
+        });
+
+        function addWidgetMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content;
+            
+            messageDiv.appendChild(contentDiv);
+            widgetMessages.appendChild(messageDiv);
+            
+            // Scroll to bottom
+            widgetMessages.scrollTop = widgetMessages.scrollHeight;
+        }
+
+        function showWidgetTyping() {
+            widgetTypingIndicator.style.display = 'flex';
+            widgetMessages.appendChild(widgetTypingIndicator);
+            widgetMessages.scrollTop = widgetMessages.scrollHeight;
+        }
+
+        function hideWidgetTyping() {
+            widgetTypingIndicator.style.display = 'none';
+            if (widgetTypingIndicator.parentNode) {
+                widgetTypingIndicator.parentNode.removeChild(widgetTypingIndicator);
+            }
+        }
+
+        async function sendWidgetMessage() {
+            const message = widgetMessageInput.value.trim();
+            if (!message) return;
+
+            // Disable input
+            widgetMessageInput.disabled = true;
+            widgetSendBtn.disabled = true;
+            
+            // Add user message
+            addWidgetMessage(message, true);
+            widgetMessageInput.value = '';
+
+            // Show typing indicator
+            showWidgetTyping();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: widgetUserId,
+                        name: widgetUserName
+                    })
+                });
+
+                const data = await response.json();
+                
+                // Hide typing indicator
+                hideWidgetTyping();
+                
+                if (data.response) {
+                    addWidgetMessage(data.response);
+                } else {
+                    addWidgetMessage('Sorry, I encountered an error. Please try again.');
+                }
+            } catch (error) {
+                hideWidgetTyping();
+                addWidgetMessage('Connection error. Please try again.');
+                console.error('Widget error:', error);
+            }
+
+            // Re-enable input
+            widgetMessageInput.disabled = false;
+            widgetSendBtn.disabled = false;
+            widgetMessageInput.focus();
+        }
+    </script>
 </body>
 </html>
