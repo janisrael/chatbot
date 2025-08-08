@@ -88,6 +88,7 @@
             <td>{{ msg.message }}</td>
             <td>{{ msg.intent or 'N/A' }}</td>
             <td>{{ '✅' if msg.sales_flag else '❌' }}</td>
+            
             <td class="success-flag-{{ 'true' if msg.success_flag else 'false' }}">
                 {{ 'Yes' if msg.success_flag else 'No' }}
             </td>
