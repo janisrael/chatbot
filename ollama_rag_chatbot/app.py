@@ -427,7 +427,7 @@ import json
 
 # App setup
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "admin123")
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "")
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
 CORS(app)
