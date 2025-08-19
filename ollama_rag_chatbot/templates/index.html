@@ -219,14 +219,14 @@
 
         <!-- <iframe src="https://dev.janisrael.com/widget" style="width: 100%; height: 700px; border: none;" allow="microphone; camera"></iframe> -->
         <div class="chat-header">
-            <h1>Bobot AI</h1>
+            <h1>Bob AI</h1>
             <p>Your friendly SourceSelect.ca assistant</p>
         </div>
         
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 <div class="message-content">
-                    👋 Hi there! I'm Bobot AI, your helpful assistant for SourceSelect.ca. How can I help you today?
+                    👋 Hi there! I'm Bob AI, your helpful assistant for SourceSelect.ca. How can I help you today?
                 </div>
             </div>
         </div>
@@ -330,7 +330,8 @@
                     body: JSON.stringify({
                         message: message,
                         user_id: userId,
-                        name: userName
+                        name: userName,
+                        website_id: 'sourceselect',
                     })
                 });
 
