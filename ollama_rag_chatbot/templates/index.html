@@ -67,6 +67,51 @@
             justify-content: flex-end;
         }
 
+        /* STEP 3A: Add these CSS styles to the <style> section in your index.html */
+/* Find the existing styles in index.html and add these new rules */
+
+/* Update the input-group to handle the new refresh button */
+.input-group {
+    display: flex;
+    width: 100%;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Style for the refresh button */
+#refreshBtn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 25px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 50px;
+}
+
+#refreshBtn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+/* Make sure input takes remaining space */
+#messageInput {
+    flex: 1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .input-group {
+        flex-wrap: wrap;
+    }
+    
+    #refreshBtn {
+        padding: 10px 12px;
+        font-size: 14px;
+    }
+}
         .message-content {
             max-width: 70%;
             padding: 12px 16px;
@@ -215,6 +260,8 @@
     </style>
 </head>
 <body>
+
+   
     <div class="chat-container">
 
         <!-- <iframe src="https://dev.janisrael.com/widget" style="width: 100%; height: 700px; border: none;" allow="microphone; camera"></iframe> -->
@@ -249,12 +296,26 @@
             </div>
         </div>
 
-        <div class="chat-input">
+        <!-- <div class="chat-input">
             <div class="input-group">
                 <input type="text" id="messageInput" placeholder="Type your message..." maxlength="500">
                 <button id="sendBtn" onclick="sendMessage()">Send</button>
             </div>
+        </div> -->
+        <div class="chat-input">
+            <div class="input-group">
+                <input type="text" id="messageInput" placeholder="Type your message..." maxlength="500">
+                
+                <!-- NEW: Refresh button (for regular users) -->
+                <button id="refreshBtn" onclick="refreshChat()" title="Refresh conversation (keeps files & knowledge)">
+                    🔄
+                </button>
+                
+                <button id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
         </div>
+
+         <!-- <div>add this to your website '<script src="http://localhost:5000/embed.js"></script>'</div> -->
     </div>
 
     <script>
@@ -356,6 +417,130 @@
             sendBtn.disabled = false;
             messageInput.focus();
         }
+
+
+        async function refreshChat() {
+    if (confirm("Refresh conversation? (Files and AI knowledge will be preserved)")) {
+        try {
+            // Show loading state
+            const refreshBtn = document.getElementById('refreshBtn');
+            const originalText = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '⏳';
+            refreshBtn.disabled = true;
+            
+            const response = await fetch('/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Clear the chat messages display
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.innerHTML = `
+                    <div class="message bot">
+                        <div class="message-content">
+                            👋 Hi there! I'm Bobot AI, your helpful assistant for SourceSelect.ca. How can I help you today?
+                        </div>
+                    </div>
+                `;
+                
+                // Clear the input field
+                document.getElementById('messageInput').value = '';
+                
+                // Show success message
+                addMessage('✅ ' + data.message, false);
+                
+                console.log('Chat refreshed successfully');
+            } else {
+                addMessage('❌ Failed to refresh: ' + data.message, false);
+            }
+        } catch (error) {
+            addMessage('❌ Error refreshing chat: ' + error.message, false);
+            console.error('Refresh error:', error);
+        } finally {
+            // Restore button state
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.innerHTML = '🔄';
+            refreshBtn.disabled = false;
+        }
+    }
+}
+
+// async function resetAll() {
+//     if (confirm("⚠️ WARNING: This will delete ALL uploaded files and AI knowledge! Are you absolutely sure?")) {
+//         if (confirm("🚨 FINAL WARNING: This action cannot be undone! Proceed?")) {
+//             try {
+//                 // Show loading state
+//                 const resetBtn = document.getElementById('resetAllBtn');
+//                 const originalText = resetBtn.innerHTML;
+//                 resetBtn.innerHTML = '⏳ Resetting...';
+//                 resetBtn.disabled = true;
+                
+//                 const response = await fetch('/reset-all', {
+//                     method: 'POST',
+//                     headers: { 'Content-Type': 'application/json' }
+//                 });
+                
+//                 const data = await response.json();
+                
+//                 if (data.status === 'success') {
+//                     // Clear the chat messages display
+//                     const chatMessages = document.getElementById('chatMessages');
+//                     chatMessages.innerHTML = `
+//                         <div class="message bot">
+//                             <div class="message-content">
+//                                 🤖 System reset complete. I'm starting fresh with no knowledge base. Please upload new files or provide information to help me assist you.
+//                             </div>
+//                         </div>
+//                     `;
+                    
+//                     // Clear the input field
+//                     document.getElementById('messageInput').value = '';
+                    
+//                     // Show success message
+//                     addMessage('🗑️ ' + data.message, false);
+                    
+//                     console.log('System reset successfully');
+//                 } else {
+//                     addMessage('❌ Failed to reset: ' + data.message, false);
+//                 }
+//             } catch (error) {
+//                 addMessage('❌ Error resetting system: ' + error.message, false);
+//                 console.error('Reset error:', error);
+//             } finally {
+//                 // Restore button state
+//                 const resetBtn = document.getElementById('resetAllBtn');
+//                 resetBtn.innerHTML = '🗑️ Reset Everything';
+//                 resetBtn.disabled = false;
+//             }
+//         }
+//     }
+// }
+
+function addStatusMessage(content, isSuccess = true) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isSuccess ? 'bot' : 'bot'}`;
+    messageDiv.style.opacity = '0.8';
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = content;
+    contentDiv.style.fontStyle = 'italic';
+    contentDiv.style.backgroundColor = isSuccess ? '#d4edda' : '#f8d7da';
+    contentDiv.style.color = isSuccess ? '#155724' : '#721c24';
+    
+    messageDiv.appendChild(contentDiv);
+    
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+
     </script>
+
+<script src="http://localhost:5000/embed.js"></script>
 </body>
 </html>
