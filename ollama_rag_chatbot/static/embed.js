@@ -1,13 +1,12 @@
 (function () {
   "use strict";
 
-  // Configuration
   const WIDGET_CONFIG = {
     apiBaseUrl: window.location.origin,
     widgetUrl: "/widget",
-    triggerButtonText: "💬 Chat",
+    triggerButtonText: "💬",
     position: "bottom-right",
-    primaryColor: "#667eea",
+    primaryColor: "#3b82f6",
     zIndex: 999999,
   };
 
@@ -34,106 +33,232 @@
 
     createStyles() {
       const styles = `
-              .bobot-widget-trigger {
-                  position: fixed;
-                  ${this.getPositionStyles()}
-                  background: ${WIDGET_CONFIG.primaryColor};
-                  color: white;
-                  border: none;
-                  border-radius: 50px;
-                  padding: 12px 20px;
-                  font-size: 14px;
-                  font-weight: 600;
-                  cursor: pointer;
-                  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-                  z-index: ${WIDGET_CONFIG.zIndex};
-                  transition: all 0.3s ease;
-                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              }
+        /* Chatbase-style Widget Styles */
+        .bobot-widget-trigger {
+          position: fixed;
+          ${this.getPositionStyles()}
+          background: linear-gradient(135deg, ${WIDGET_CONFIG.primaryColor} 0%, #2563eb 100%);
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 60px;
+          height: 60px;
+          font-size: 24px;
+          cursor: pointer;
+          box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3), 0 2px 8px rgba(0, 0, 0, 0.1);
+          z-index: ${WIDGET_CONFIG.zIndex};
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
-              .bobot-widget-trigger:hover {
-                  transform: translateY(-2px);
-                  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
-              }
+        .bobot-widget-trigger:hover {
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4), 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
 
-              .bobot-widget-container {
-                  position: fixed;
-                  ${this.getWidgetPositionStyles()}
-                  width: 350px;
-                  height: 500px;
-                  z-index: ${WIDGET_CONFIG.zIndex + 1};
-                  transform: scale(0) translateY(20px);
-                  opacity: 0;
-                  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-                  transform-origin: ${this.getTransformOrigin()};
-              }
+        .bobot-widget-trigger:active {
+          transform: translateY(-1px) scale(1.02);
+        }
 
-              .bobot-widget-container.open {
-                  transform: scale(1) translateY(0);
-                  opacity: 1;
-              }
+        .bobot-widget-container {
+          position: fixed;
+          ${this.getWidgetPositionStyles()}
+          width: 380px;
+          height: 600px;
+          z-index: ${WIDGET_CONFIG.zIndex + 1};
+          transform: scale(0.95) translateY(20px);
+          opacity: 0;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transform-origin: ${this.getTransformOrigin()};
+          pointer-events: none;
+        }
 
-              .bobot-widget-iframe {
-                  width: 100%;
-                  height: 100%;
-                  border: none;
-                  border-radius: 12px;
-                  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-              }
+        .bobot-widget-container.open {
+          transform: scale(1) translateY(0);
+          opacity: 1;
+          pointer-events: all;
+        }
 
-              .bobot-widget-close {
-                  position: absolute;
-                  top: -10px;
-                  right: -10px;
-                  background: #ff4757;
-                  color: white;
-                  border: none;
-                  border-radius: 50%;
-                  width: 24px;
-                  height: 24px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-                  z-index: ${WIDGET_CONFIG.zIndex + 2};
-              }
+        .bobot-widget-iframe {
+          width: 100%;
+          height: 100%;
+          border: none;
+          border-radius: 20px;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
+          background: white;
+        }
 
-              .bobot-widget-close:hover {
-                  background: #ff3742;
-              }
+        .bobot-widget-close {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 28px;
+          height: 28px;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3), 0 2px 6px rgba(0, 0, 0, 0.1);
+          z-index: ${WIDGET_CONFIG.zIndex + 2};
+          transition: all 0.2s;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
 
-              @media (max-width: 768px) {
-                  .bobot-widget-container {
-                      position: fixed !important;
-                      top: 0 !important;
-                      left: 0 !important;
-                      right: 0 !important;
-                      bottom: 0 !important;
-                      width: 100% !important;
-                      height: 100% !important;
-                      transform: translateY(100%);
-                      border-radius: 0 !important;
-                  }
+        .bobot-widget-close:hover {
+          background: #dc2626;
+          transform: scale(1.1);
+          box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4), 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
 
-                  .bobot-widget-container.open {
-                      transform: translateY(0);
-                  }
+        /* Notification Badge */
+        .bobot-widget-badge {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background: #ef4444;
+          color: white;
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+          animation: pulse 2s infinite;
+        }
 
-                  .bobot-widget-iframe {
-                      border-radius: 0 !important;
-                  }
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
 
-                  .bobot-widget-close {
-                      top: 20px;
-                      right: 20px;
-                      width: 32px;
-                      height: 32px;
-                      font-size: 16px;
-                  }
-              }
-          `;
+        /* Welcome Message */
+        .bobot-welcome-message {
+          position: fixed;
+          ${this.getWelcomePositionStyles()}
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          padding: 16px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+          max-width: 280px;
+          z-index: ${WIDGET_CONFIG.zIndex - 1};
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          opacity: 0;
+          transform: translateY(10px);
+          transition: all 0.3s ease;
+          pointer-events: none;
+        }
+
+        .bobot-welcome-message.show {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: all;
+        }
+
+        .bobot-welcome-message::after {
+          content: '';
+          position: absolute;
+          bottom: -8px;
+          right: 24px;
+          width: 16px;
+          height: 16px;
+          background: white;
+          border-right: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e5e7eb;
+          transform: rotate(45deg);
+        }
+
+        .bobot-welcome-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .bobot-welcome-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+        }
+
+        .bobot-welcome-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: #111827;
+          margin: 0;
+        }
+
+        .bobot-welcome-message p {
+          margin: 0;
+          font-size: 13px;
+          color: #6b7280;
+          line-height: 1.4;
+        }
+
+        .bobot-welcome-close {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          background: transparent;
+          border: none;
+          color: #9ca3af;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        }
+
+        .bobot-welcome-close:hover {
+          color: #6b7280;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+          .bobot-widget-container {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            transform: translateY(100%);
+            border-radius: 0 !important;
+          }
+
+          .bobot-widget-container.open {
+            transform: translateY(0);
+          }
+
+          .bobot-widget-iframe {
+            border-radius: 0 !important;
+          }
+
+          .bobot-widget-close {
+            top: 16px;
+            right: 16px;
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+          }
+
+          .bobot-welcome-message {
+            display: none;
+          }
+        }
+      `;
 
       const styleSheet = document.createElement("style");
       styleSheet.textContent = styles;
@@ -143,26 +268,39 @@
     getPositionStyles() {
       switch (WIDGET_CONFIG.position) {
         case "bottom-left":
-          return "bottom: 20px; left: 20px;";
+          return "bottom: 24px; left: 24px;";
         case "top-right":
-          return "top: 20px; right: 20px;";
+          return "top: 24px; right: 24px;";
         case "top-left":
-          return "top: 20px; left: 20px;";
+          return "top: 24px; left: 24px;";
         default:
-          return "bottom: 20px; right: 20px;";
+          return "bottom: 24px; right: 24px;";
       }
     }
 
     getWidgetPositionStyles() {
       switch (WIDGET_CONFIG.position) {
         case "bottom-left":
-          return "bottom: 80px; left: 20px;";
+          return "bottom: 100px; left: 24px;";
         case "top-right":
-          return "top: 80px; right: 20px;";
+          return "top: 100px; right: 24px;";
         case "top-left":
-          return "top: 80px; left: 20px;";
+          return "top: 100px; left: 24px;";
         default:
-          return "bottom: 80px; right: 20px;";
+          return "bottom: 100px; right: 24px;";
+      }
+    }
+
+    getWelcomePositionStyles() {
+      switch (WIDGET_CONFIG.position) {
+        case "bottom-left":
+          return "bottom: 100px; left: 24px;";
+        case "top-right":
+          return "top: 100px; right: 24px;";
+        case "top-left":
+          return "top: 100px; left: 24px;";
+        default:
+          return "bottom: 100px; right: 104px;";
       }
     }
 
@@ -182,9 +320,87 @@
     createTriggerButton() {
       this.triggerButton = document.createElement("button");
       this.triggerButton.className = "bobot-widget-trigger";
-      this.triggerButton.textContent = WIDGET_CONFIG.triggerButtonText;
+      this.triggerButton.innerHTML = WIDGET_CONFIG.triggerButtonText;
+      this.triggerButton.setAttribute("aria-label", "Open chat");
       this.triggerButton.addEventListener("click", () => this.toggleWidget());
       document.body.appendChild(this.triggerButton);
+
+      // Add notification badge (optional)
+      this.addNotificationBadge();
+
+      // Show welcome message after delay
+      setTimeout(() => this.showWelcomeMessage(), 3000);
+    }
+
+    addNotificationBadge() {
+      const badge = document.createElement("div");
+      badge.className = "bobot-widget-badge";
+      badge.textContent = "1";
+      this.triggerButton.appendChild(badge);
+
+      // Remove badge after first interaction
+      this.triggerButton.addEventListener(
+        "click",
+        () => {
+          badge.remove();
+        },
+        { once: true }
+      );
+    }
+
+    showWelcomeMessage() {
+      if (this.isOpen) return;
+
+      const welcomeMessage = document.createElement("div");
+      welcomeMessage.className = "bobot-welcome-message";
+      welcomeMessage.innerHTML = `
+        <button class="bobot-welcome-close" aria-label="Close message">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div class="bobot-welcome-header">
+          <img src="https://backend.chatbase.co/storage/v1/object/public/chatbots-profile-pictures/f295df57-57e4-4b10-824d-e5659916d586/i91yeOUDGtHiX4ImHr8tA.jpg?width=40&height=40&quality=50" 
+               alt="Bob AI" class="bobot-welcome-avatar">
+          <h3 class="bobot-welcome-title">Bob AI</h3>
+        </div>
+        <p>Hi! I'm here to help you with SourceSelect services. Feel free to ask me anything!</p>
+      `;
+
+      document.body.appendChild(welcomeMessage);
+
+      // Show with animation
+      setTimeout(() => welcomeMessage.classList.add("show"), 100);
+
+      // Auto-hide after 8 seconds
+      setTimeout(() => this.hideWelcomeMessage(), 8000);
+
+      // Close button functionality
+      welcomeMessage.querySelector(".bobot-welcome-close").addEventListener("click", () => {
+        this.hideWelcomeMessage();
+      });
+
+      // Click to open chat
+      welcomeMessage.addEventListener("click", (e) => {
+        if (!e.target.closest(".bobot-welcome-close")) {
+          this.openWidget();
+          this.hideWelcomeMessage();
+        }
+      });
+
+      this.welcomeMessage = welcomeMessage;
+    }
+
+    hideWelcomeMessage() {
+      if (this.welcomeMessage) {
+        this.welcomeMessage.classList.remove("show");
+        setTimeout(() => {
+          if (this.welcomeMessage && this.welcomeMessage.parentNode) {
+            this.welcomeMessage.remove();
+          }
+        }, 300);
+      }
     }
 
     createWidget() {
@@ -194,12 +410,14 @@
       const closeButton = document.createElement("button");
       closeButton.className = "bobot-widget-close";
       closeButton.innerHTML = "×";
+      closeButton.setAttribute("aria-label", "Close chat");
       closeButton.addEventListener("click", () => this.closeWidget());
 
       this.iframe = document.createElement("iframe");
       this.iframe.className = "bobot-widget-iframe";
       this.iframe.src = WIDGET_CONFIG.apiBaseUrl + WIDGET_CONFIG.widgetUrl;
       this.iframe.allow = "microphone; camera";
+      this.iframe.setAttribute("title", "Bob AI Chat Widget");
 
       this.widget.appendChild(closeButton);
       this.widget.appendChild(this.iframe);
@@ -207,6 +425,7 @@
     }
 
     attachEventListeners() {
+      // Close on outside click
       document.addEventListener("click", (e) => {
         if (
           this.isOpen &&
@@ -217,15 +436,27 @@
         }
       });
 
+      // Close on Escape key
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && this.isOpen) {
           this.closeWidget();
         }
       });
 
+      // Handle responsive behavior
       window.addEventListener("resize", () => {
         if (this.isOpen && window.innerWidth <= 768) {
           this.widget.style.transform = "translateY(0)";
+        }
+      });
+
+      // Listen for messages from iframe
+      window.addEventListener("message", (event) => {
+        if (event.origin !== WIDGET_CONFIG.apiBaseUrl) return;
+
+        // Handle iframe events (like closing)
+        if (event.data.type === "close_widget") {
+          this.closeWidget();
         }
       });
     }
@@ -241,8 +472,10 @@
     openWidget() {
       this.isOpen = true;
       this.widget.classList.add("open");
-      this.triggerButton.style.display = "none";
+      this.triggerButton.style.transform = "scale(0.9)";
+      this.hideWelcomeMessage();
 
+      // Focus iframe after animation
       setTimeout(() => {
         if (this.iframe && this.iframe.contentWindow) {
           this.iframe.contentWindow.focus();
@@ -255,7 +488,7 @@
     closeWidget() {
       this.isOpen = false;
       this.widget.classList.remove("open");
-      this.triggerButton.style.display = "block";
+      this.triggerButton.style.transform = "scale(1)";
 
       this.dispatchEvent("bobot:widget:closed");
     }
@@ -268,7 +501,7 @@
     }
 
     show() {
-      this.triggerButton.style.display = "block";
+      this.triggerButton.style.display = "flex";
     }
 
     hide() {
@@ -284,6 +517,9 @@
       }
       if (this.triggerButton) {
         this.triggerButton.remove();
+      }
+      if (this.welcomeMessage) {
+        this.welcomeMessage.remove();
       }
       window.BobotWidget = null;
     }
@@ -307,6 +543,7 @@
     }
   }
 
+  // Public API
   window.BobotWidgetAPI = {
     init: initWidget,
     show: () => window.BobotWidget?.show(),
@@ -318,248 +555,5 @@
 
   initWidget();
 
-  console.log("Widget loaded successfully");
+  console.log("✅ Bobot Widget (Chatbase Style) loaded successfully");
 })();
-
-// New embed.js with full widget rendering from script only
-
-// (function () {
-//   "use strict";
-
-//   const WIDGET_CONFIG = {
-//     apiBaseUrl: window.location.origin,
-//     widgetUrl: "/widget",
-//     triggerButtonText: "Chat with us",
-//     position: "bottom-right",
-//     primaryColor: "#667eea",
-//     zIndex: 999999,
-//     title: "Chat with Bobot AI",
-//   };
-
-//   if (window.BobotWidget) {
-//     console.warn("Bobot Widget already loaded");
-//     return;
-//   }
-
-//   class BobotWidget {
-//     constructor() {
-//       this.isOpen = false;
-//       this.widget = null;
-//       this.triggerButton = null;
-//       this.init();
-//     }
-
-//     init() {
-//       this.createStyles();
-//       this.createTriggerButton();
-//       this.createWidget();
-//       this.attachEvents();
-//     }
-
-//     createStyles() {
-//       const style = document.createElement("style");
-//       style.textContent = `
-//         .bobot-widget-trigger {
-//           position: fixed;
-//           ${this.getPositionStyles()}
-//           background: ${WIDGET_CONFIG.primaryColor};
-//           color: white;
-//           border: none;
-//           border-radius: 50px;
-//           padding: 12px 20px;
-//           font-size: 14px;
-//           font-weight: 600;
-//           cursor: pointer;
-//           z-index: ${WIDGET_CONFIG.zIndex};
-//           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-//           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-//         }
-//         .bobot-widget-container {
-//           position: fixed;
-//           ${this.getWidgetPositionStyles()}
-//           width: 350px;
-//           height: 500px;
-//           background: white;
-//           border-radius: 12px;
-//           box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-//           display: none;
-//           flex-direction: column;
-//           overflow: hidden;
-//           z-index: ${WIDGET_CONFIG.zIndex + 1};
-//           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-//         }
-//         .bobot-widget-header {
-//           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-//           color: white;
-//           padding: 15px;
-//           text-align: center;
-//           font-size: 16px;
-//           font-weight: 600;
-//         }
-//         .bobot-widget-messages {
-//           flex: 1;
-//           padding: 15px;
-//           overflow-y: auto;
-//           background: #f8f9fa;
-//         }
-//         .bobot-message {
-//           margin-bottom: 12px;
-//           display: flex;
-//           flex-direction: column;
-//         }
-//         .bobot-message-content {
-//           max-width: 80%;
-//           padding: 8px 12px;
-//           border-radius: 12px;
-//           font-size: 13px;
-//           line-height: 1.4;
-//         }
-//         .bobot-message.user .bobot-message-content {
-//           background: #667eea;
-//           color: white;
-//           align-self: flex-end;
-//           border-bottom-right-radius: 3px;
-//         }
-//         .bobot-message.bot .bobot-message-content {
-//           background: #e9ecef;
-//           color: #333;
-//           align-self: flex-start;
-//           border-bottom-left-radius: 3px;
-//         }
-//         .bobot-widget-input {
-//           display: flex;
-//           padding: 12px;
-//           background: white;
-//           border-top: 1px solid #eee;
-//           gap: 8px;
-//         }
-//         .bobot-widget-input input {
-//           flex: 1;
-//           padding: 8px 12px;
-//           border: 1px solid #ddd;
-//           border-radius: 18px;
-//           font-size: 13px;
-//         }
-//         .bobot-widget-input button {
-//           background: #667eea;
-//           color: white;
-//           border: none;
-//           padding: 8px 16px;
-//           border-radius: 18px;
-//           font-size: 13px;
-//           cursor: pointer;
-//         }
-//       `;
-//       document.head.appendChild(style);
-//     }
-
-//     getPositionStyles() {
-//       switch (WIDGET_CONFIG.position) {
-//         case "bottom-left":
-//           return "bottom: 20px; left: 20px;";
-//         case "top-right":
-//           return "top: 20px; right: 20px;";
-//         case "top-left":
-//           return "top: 20px; left: 20px;";
-//         default:
-//           return "bottom: 20px; right: 20px;";
-//       }
-//     }
-
-//     getWidgetPositionStyles() {
-//       switch (WIDGET_CONFIG.position) {
-//         case "bottom-left":
-//           return "bottom: 70px; left: 20px;";
-//         case "top-right":
-//           return "top: 70px; right: 20px;";
-//         case "top-left":
-//           return "top: 70px; left: 20px;";
-//         default:
-//           return "bottom: 70px; right: 20px;";
-//       }
-//     }
-
-//     createTriggerButton() {
-//       this.triggerButton = document.createElement("button");
-//       this.triggerButton.className = "bobot-widget-trigger";
-//       this.triggerButton.textContent = WIDGET_CONFIG.triggerButtonText;
-//       this.triggerButton.onclick = () => this.toggleWidget();
-//       document.body.appendChild(this.triggerButton);
-//     }
-
-//     createWidget() {
-//       this.widget = document.createElement("div");
-//       this.widget.className = "bobot-widget-container";
-
-//       this.widget.innerHTML = `
-//         <div class="bobot-widget-header">${WIDGET_CONFIG.title}</div>
-//         <div class="bobot-widget-messages" id="bobotMessages"></div>
-//         <div class="bobot-widget-input">
-//           <input type="text" id="bobotInput" placeholder="Ask me anything..." />
-//           <button id="bobotSend">Send</button>
-//         </div>
-//       `;
-
-//       document.body.appendChild(this.widget);
-//     }
-
-//     attachEvents() {
-//       const input = () => document.getElementById("bobotInput");
-//       const sendBtn = () => document.getElementById("bobotSend");
-//       const msgBox = () => document.getElementById("bobotMessages");
-
-//       sendBtn().onclick = () => this.handleSend(input().value);
-//       input().addEventListener("keypress", (e) => {
-//         if (e.key === "Enter") this.handleSend(input().value);
-//       });
-//     }
-
-//     handleSend(text) {
-//       const input = document.getElementById("bobotInput");
-//       if (!text.trim()) return;
-//       this.addMessage(text, true);
-//       input.value = "";
-//       fetch(WIDGET_CONFIG.apiBaseUrl + "/chat", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ message: text, user_id: "widget_user" }),
-//       })
-//         .then((res) => res.json())
-//         .then((data) => {
-//           if (data.response) this.addMessage(data.response, false);
-//           else this.addMessage("Sorry, something went wrong.", false);
-//         })
-//         .catch((err) => {
-//           console.error("Widget Error", err);
-//           this.addMessage("Connection error. Please try again.", false);
-//         });
-//     }
-
-//     addMessage(text, isUser) {
-//       const msgBox = document.getElementById("bobotMessages");
-//       const msg = document.createElement("div");
-//       msg.className = `bobot-message ${isUser ? "user" : "bot"}`;
-//       msg.innerHTML = `<div class="bobot-message-content">${text}</div>`;
-//       msgBox.appendChild(msg);
-//       msgBox.scrollTop = msgBox.scrollHeight;
-//     }
-
-//     toggleWidget() {
-//       if (this.widget.style.display === "flex") {
-//         this.widget.style.display = "none";
-//       } else {
-//         this.widget.style.display = "flex";
-//       }
-//     }
-//   }
-
-//   function initWidget() {
-//     if (document.readyState === "loading") {
-//       document.addEventListener("DOMContentLoaded", () => new BobotWidget());
-//     } else {
-//       new BobotWidget();
-//     }
-//   }
-
-//   initWidget();
-// })();
