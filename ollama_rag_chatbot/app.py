@@ -1586,6 +1586,59 @@ from werkzeug.utils import secure_filename
 import hashlib
 from urllib.parse import urlparse
 
+# Add dataset utilities for HuggingFace
+def load_training_dataset(dataset_name, use_case="conversation"):
+    """Load and prepare training dataset from HuggingFace"""
+    try:
+        from datasets import load_dataset
+        
+        print(f"📊 Loading dataset: {dataset_name} for {use_case}")
+        
+        if dataset_name == "lmsys/chatbot_arena_conversations":
+            dataset = load_dataset(dataset_name, split="train[:1000]")  # Load first 1000 samples
+            # Process conversations for training
+            conversations = []
+            for example in dataset:
+                if example.get("conversation"):
+                    conversations.append({
+                        "input": example["conversation"][0]["content"] if len(example["conversation"]) > 0 else "",
+                        "output": example["conversation"][1]["content"] if len(example["conversation"]) > 1 else "",
+                        "source": "arena"
+                    })
+            return conversations[:100]  # Return first 100 for demo
+            
+        elif dataset_name == "bitext/Bitext-customer-support-llm-chatbot-training-dataset":
+            dataset = load_dataset(dataset_name, split="train[:500]")
+            conversations = []
+            for example in dataset:
+                conversations.append({
+                    "input": example.get("instruction", ""),
+                    "output": example.get("response", ""),
+                    "intent": example.get("intent", ""),
+                    "source": "bitext"
+                })
+            return conversations[:50]  # Return first 50 for demo
+            
+        elif dataset_name == "lmsys/lmsys-chat-1m":
+            # This is a very large dataset, so we'll just load a small sample
+            dataset = load_dataset(dataset_name, split="train[:100]")
+            conversations = []
+            for example in dataset:
+                if example.get("conversation"):
+                    conversations.append({
+                        "input": str(example["conversation"][0]["content"]) if len(example["conversation"]) > 0 else "",
+                        "output": str(example["conversation"][1]["content"]) if len(example["conversation"]) > 1 else "",
+                        "model": example.get("model", "unknown"),
+                        "source": "lmsys"
+                    })
+            return conversations[:25]  # Return first 25 for demo
+            
+        return []
+        
+    except Exception as e:
+        print(f"❌ Error loading dataset {dataset_name}: {e}")
+        return []
+
 # App setup
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "admin123")
@@ -1636,6 +1689,20 @@ WEBSITE_CONFIGS = {
             'provider': 'ollama',
             'model': 'llama3.1:8b',
             'temperature': 0.7
+        }
+    },
+    'demo-hf.com': {
+        'name': 'HuggingFace Demo',
+        'bot_name': 'Luna',
+        'primary_color': '#ff6b6b',
+        'knowledge_base': 'hf_demo',
+        'allowed_origins': ['https://demo-hf.com'],
+        'custom_prompt': 'You are Luna, an AI assistant powered by HuggingFace models...',
+        'features': ['conversation', 'reasoning'],
+        'llm_config': {
+            'provider': 'huggingface',
+            'model': 'microsoft/DialoGPT-medium',
+            'temperature': 0.8
         }
     },
     'default': {
@@ -1709,6 +1776,49 @@ def load_llm_config():
                 "codellama": {"temperature": 0.5}
             },
             "default_model": "llama3.1:8b"
+        },
+        "huggingface": {
+            "api_token": os.getenv("HUGGINGFACE_API_TOKEN", ""),
+            "models": {
+                "microsoft/DialoGPT-medium": {
+                    "temperature": 0.8,
+                    "max_length": 512,
+                    "use_case": "conversation",
+                    "description": "Optimized for natural dialogue and conversational responses"
+                },
+                "microsoft/Phi-3-mini-4k-instruct": {
+                    "temperature": 0.6,
+                    "max_length": 1024,
+                    "use_case": "reasoning", 
+                    "description": "Excellent for reasoning, instruction following, and problem solving"
+                },
+                "meta-llama/Llama-2-7b-chat-hf": {
+                    "temperature": 0.7,
+                    "max_length": 1024,
+                    "use_case": "general",
+                    "description": "General purpose conversational model with strong reasoning capabilities"
+                }
+            },
+            "default_model": "microsoft/DialoGPT-medium"
+        },
+        "datasets": {
+            "conversation_training": [
+                {
+                    "name": "lmsys/chatbot_arena_conversations",
+                    "description": "33k cleaned conversations with human preferences from multiple LLMs",
+                    "use_case": "conversation_improvement"
+                },
+                {
+                    "name": "bitext/Bitext-customer-support-llm-chatbot-training-dataset", 
+                    "description": "Customer support interactions with linguistic phenomena tags",
+                    "use_case": "customer_support"
+                },
+                {
+                    "name": "lmsys/lmsys-chat-1m",
+                    "description": "1M real-world conversations with 25 state-of-the-art LLMs",
+                    "use_case": "large_scale_training"
+                }
+            ]
         },
         "website_overrides": {}  # Per-website LLM configurations
     }
@@ -1877,6 +1987,100 @@ def create_llm_instance(website_id=None):
             
         except Exception as e:
             print(f"Failed to initialize Ollama for {website_id}: {e}")
+            return create_mock_llm(), "mock"
+    
+    elif provider == "huggingface":
+        try:
+            from langchain_huggingface import HuggingFacePipeline
+            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+            import torch
+            
+            api_token = effective_config["config"]["huggingface"]["api_token"] or os.getenv("HUGGINGFACE_API_TOKEN")
+            model_config = effective_config["config"]["huggingface"]["models"].get(model, {})
+            max_length = model_config.get("max_length", 512)
+            
+            # Determine device (GPU if available, else CPU)
+            device = 0 if torch.cuda.is_available() else -1
+            
+            try:
+                # Create the pipeline
+                if api_token:
+                    # Use token for private models or higher rate limits
+                    hf_pipeline = pipeline(
+                        "text-generation",
+                        model=model,
+                        tokenizer=model,
+                        device=device,
+                        model_kwargs={"torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32},
+                        use_auth_token=api_token,
+                        max_length=max_length,
+                        temperature=temperature,
+                        do_sample=True,
+                        pad_token_id=50256  # Common pad token id
+                    )
+                else:
+                    # Use without token for public models
+                    hf_pipeline = pipeline(
+                        "text-generation",
+                        model=model,
+                        tokenizer=model,
+                        device=device,
+                        model_kwargs={"torch_dtype": torch.float16 if torch.cuda.is_available() else torch.float32},
+                        max_length=max_length,
+                        temperature=temperature,
+                        do_sample=True,
+                        pad_token_id=50256  # Common pad token id
+                    )
+                
+                # Create LangChain wrapper
+                llm = HuggingFacePipeline(
+                    pipeline=hf_pipeline,
+                    model_kwargs={
+                        "temperature": temperature,
+                        "max_length": max_length,
+                        "do_sample": True
+                    }
+                )
+                
+                print(f"🤖 Using HuggingFace model: {model} for website {website_id or 'global'}")
+                print(f"📊 Model use case: {model_config.get('use_case', 'general')}")
+                print(f"📝 Description: {model_config.get('description', 'No description available')}")
+                return llm, "huggingface"
+                
+            except Exception as model_error:
+                print(f"❌ HuggingFace model loading failed: {model_error}")
+                print(f"💡 Trying to use a smaller fallback model...")
+                
+                # Fallback to a smaller, more reliable model
+                try:
+                    fallback_pipeline = pipeline(
+                        "text-generation",
+                        model="microsoft/DialoGPT-small",  # Smaller fallback
+                        device=device,
+                        max_length=256,
+                        temperature=0.8,
+                        do_sample=True,
+                        pad_token_id=50256
+                    )
+                    
+                    llm = HuggingFacePipeline(
+                        pipeline=fallback_pipeline,
+                        model_kwargs={
+                            "temperature": 0.8,
+                            "max_length": 256,
+                            "do_sample": True
+                        }
+                    )
+                    
+                    print(f"🤖 Using HuggingFace fallback model: microsoft/DialoGPT-small")
+                    return llm, "huggingface"
+                    
+                except Exception as fallback_error:
+                    print(f"❌ HuggingFace fallback also failed: {fallback_error}")
+                    return create_mock_llm(), "mock"
+            
+        except Exception as e:
+            print(f"Failed to initialize HuggingFace for {website_id}: {e}")
             return create_mock_llm(), "mock"
     
     return create_mock_llm(), "mock"
@@ -2170,6 +2374,12 @@ def get_llm_config_api():
                 "models": global_config["ollama"]["models"],
                 "default_model": global_config["ollama"]["default_model"]
             },
+            "huggingface": {
+                "has_api_token": bool(global_config.get("huggingface", {}).get("api_token")),
+                "models": global_config.get("huggingface", {}).get("models", {}),
+                "default_model": global_config.get("huggingface", {}).get("default_model", "microsoft/DialoGPT-medium")
+            },
+            "datasets": global_config.get("datasets", {}),
             "website_overrides": global_config.get("website_overrides", {}),
             "available_websites": list(WEBSITE_CONFIGS.keys())
         }
@@ -2210,6 +2420,21 @@ def update_llm_config_api():
                     global_config["ollama"]["default_model"] = ollama_data["default_model"]
                 if "models" in ollama_data:
                     global_config["ollama"]["models"].update(ollama_data["models"])
+            
+            if "huggingface" in data:
+                huggingface_data = data["huggingface"]
+                if "huggingface" not in global_config:
+                    global_config["huggingface"] = {
+                        "api_token": "",
+                        "models": {},
+                        "default_model": "microsoft/DialoGPT-medium"
+                    }
+                if "api_token" in huggingface_data and huggingface_data["api_token"]:
+                    global_config["huggingface"]["api_token"] = huggingface_data["api_token"]
+                if "default_model" in huggingface_data:
+                    global_config["huggingface"]["default_model"] = huggingface_data["default_model"]
+                if "models" in huggingface_data:
+                    global_config["huggingface"]["models"].update(huggingface_data["models"])
         
         elif config_type == "website" and website_id:
             # Update website-specific configuration
@@ -2276,6 +2501,84 @@ def test_llm_api():
         
     except Exception as e:
         return jsonify({"error": f"LLM test failed: {str(e)}"}), 500
+
+@app.route("/api/datasets", methods=["GET"])
+def get_datasets_api():
+    """Get available HuggingFace datasets for training"""
+    try:
+        global_config = load_llm_config()
+        datasets = global_config.get("datasets", {})
+        
+        return jsonify({
+            "status": "success",
+            "datasets": datasets,
+            "total_datasets": len(datasets.get("conversation_training", [])),
+            "recommended_models": {
+                "conversation": "microsoft/DialoGPT-medium",
+                "reasoning": "microsoft/Phi-3-mini-4k-instruct", 
+                "general": "meta-llama/Llama-2-7b-chat-hf"
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/huggingface/models", methods=["GET"])
+def get_huggingface_models_api():
+    """Get available HuggingFace models with their details"""
+    try:
+        global_config = load_llm_config()
+        hf_config = global_config.get("huggingface", {})
+        models = hf_config.get("models", {})
+        
+        # Add more detailed model information
+        enhanced_models = {}
+        for model_name, config in models.items():
+            enhanced_models[model_name] = {
+                **config,
+                "model_id": model_name,
+                "provider": "huggingface",
+                "requires_token": model_name.startswith("meta-llama/"),  # Meta models typically need auth
+                "estimated_size": {
+                    "microsoft/DialoGPT-medium": "350MB",
+                    "microsoft/Phi-3-mini-4k-instruct": "2.4GB", 
+                    "meta-llama/Llama-2-7b-chat-hf": "13GB"
+                }.get(model_name, "Unknown")
+            }
+        
+        return jsonify({
+            "status": "success",
+            "models": enhanced_models,
+            "default_model": hf_config.get("default_model"),
+            "has_api_token": bool(hf_config.get("api_token"))
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/datasets/load", methods=["POST"])
+def load_dataset_api():
+    """Load a specific dataset for preview"""
+    try:
+        data = request.json
+        dataset_name = data.get("dataset_name")
+        use_case = data.get("use_case", "conversation")
+        
+        if not dataset_name:
+            return jsonify({"error": "Dataset name is required"}), 400
+        
+        # Load dataset sample
+        conversations = load_training_dataset(dataset_name, use_case)
+        
+        return jsonify({
+            "status": "success",
+            "dataset_name": dataset_name,
+            "use_case": use_case,
+            "sample_count": len(conversations),
+            "samples": conversations[:10],  # Return first 10 samples for preview
+            "total_loaded": len(conversations)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/website-config", methods=["GET"])
 def get_website_config_api():
