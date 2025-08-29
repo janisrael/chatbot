@@ -1,0 +1,8 @@
+{
+  "name": "Conversational Dataset",
+  "source": "Manually created for training",
+  "description": "Conversational exchanges for chatbot training and fine-tuning",
+  "total_conversations": 100,
+  "format": "JSON with conversation turns",
+  "usage": "Training data for conversational AI models"
+}

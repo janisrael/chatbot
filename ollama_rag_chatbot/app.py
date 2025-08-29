@@ -1710,6 +1710,14 @@ def load_llm_config():
             },
             "default_model": "llama3.1:8b"
         },
+        "huggingface": {
+            "models": {
+                "gpt2": {"temperature": 0.7, "max_length": 1000},
+                "distilgpt2": {"temperature": 0.8, "max_length": 1000},
+                "microsoft/DialoGPT-small": {"temperature": 0.9, "max_length": 1000}
+            },
+            "default_model": "gpt2"
+        },
         "website_overrides": {}  # Per-website LLM configurations
     }
     
@@ -1877,6 +1885,49 @@ def create_llm_instance(website_id=None):
             
         except Exception as e:
             print(f"Failed to initialize Ollama for {website_id}: {e}")
+            return create_mock_llm(), "mock"
+    
+    elif provider == "huggingface":
+        try:
+            from langchain_community.llms import HuggingFacePipeline
+            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+            import torch
+            
+            # Get model configuration
+            model_config = effective_config["config"]["huggingface"]["models"][model]
+            max_length = model_config.get("max_length", 1000)
+            
+            # Load tokenizer and model
+            tokenizer = AutoTokenizer.from_pretrained(model)
+            model_instance = AutoModelForCausalLM.from_pretrained(
+                model,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                device_map="auto" if torch.cuda.is_available() else None,
+                low_cpu_mem_usage=True
+            )
+            
+            # Create pipeline
+            pipe = pipeline(
+                "text-generation",
+                model=model_instance,
+                tokenizer=tokenizer,
+                max_length=max_length,
+                temperature=temperature,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id
+            )
+            
+            # Create LangChain wrapper
+            llm = HuggingFacePipeline(
+                pipeline=pipe,
+                model_kwargs={"temperature": temperature}
+            )
+            
+            print(f"🤖 Using Hugging Face model: {model} for website {website_id or 'global'}")
+            return llm, "huggingface"
+            
+        except Exception as e:
+            print(f"Failed to initialize Hugging Face model {model} for {website_id}: {e}")
             return create_mock_llm(), "mock"
     
     return create_mock_llm(), "mock"
