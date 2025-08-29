@@ -1638,6 +1638,48 @@ WEBSITE_CONFIGS = {
             'temperature': 0.7
         }
     },
+    'mistral-demo.com': {
+        'name': 'Mistral Demo',
+        'bot_name': 'Mira',
+        'primary_color': '#9b59b6',
+        'knowledge_base': 'mistral_demo',
+        'allowed_origins': ['*'],
+        'custom_prompt': None,
+        'features': ['basic_support', 'analytics'],
+        'llm_config': {
+            'provider': 'huggingface',
+            'model': 'mistralai/Mistral-7B-Instruct-v0.2',
+            'temperature': 0.7
+        }
+    },
+    'llama-demo.com': {
+        'name': 'Llama Demo',
+        'bot_name': 'Lenny',
+        'primary_color': '#e74c3c',
+        'knowledge_base': 'llama_demo',
+        'allowed_origins': ['*'],
+        'custom_prompt': None,
+        'features': ['basic_support'],
+        'llm_config': {
+            'provider': 'huggingface',
+            'model': 'meta-llama/Llama-3-8B-Instruct',
+            'temperature': 0.8
+        }
+    },
+    'gemma-demo.com': {
+        'name': 'Gemma Demo',
+        'bot_name': 'Gem',
+        'primary_color': '#3498db',
+        'knowledge_base': 'gemma_demo',
+        'allowed_origins': ['*'],
+        'custom_prompt': None,
+        'features': ['basic_support'],
+        'llm_config': {
+            'provider': 'huggingface',
+            'model': 'google/gemma-7b-it',
+            'temperature': 0.7
+        }
+    },
     'default': {
         'name': 'AI Assistant',
         'bot_name': 'Assistant',
@@ -1709,6 +1751,30 @@ def load_llm_config():
                 "codellama": {"temperature": 0.5}
             },
             "default_model": "llama3.1:8b"
+        },
+        "huggingface": {
+            "api_key": os.getenv("HUGGINGFACE_API_KEY", ""),
+            "models": {
+                "mistralai/Mistral-7B-Instruct-v0.2": {
+                    "temperature": 0.7,
+                    "max_length": 2048,
+                    "description": "Efficient 7B model with strong reasoning and instruction-following capabilities"
+                },
+                "meta-llama/Llama-3-8B-Instruct": {
+                    "temperature": 0.8,
+                    "max_length": 4096,
+                    "description": "Latest Llama 3 model optimized for conversational AI"
+                },
+                "google/gemma-7b-it": {
+                    "temperature": 0.7,
+                    "max_length": 2048,
+                    "description": "Google's instruction-tuned model for natural conversations"
+                }
+            },
+            "default_model": "mistralai/Mistral-7B-Instruct-v0.2",
+            "device": "auto",  # auto, cpu, cuda
+            "load_in_8bit": False,
+            "load_in_4bit": True  # Use 4-bit quantization for efficiency
         },
         "website_overrides": {}  # Per-website LLM configurations
     }
@@ -1878,6 +1944,92 @@ def create_llm_instance(website_id=None):
         except Exception as e:
             print(f"Failed to initialize Ollama for {website_id}: {e}")
             return create_mock_llm(), "mock"
+    
+    elif provider == "huggingface":
+        try:
+            from langchain_huggingface import HuggingFacePipeline
+            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+            import torch
+            
+            hf_config = effective_config["config"]["huggingface"]
+            api_key = hf_config["api_key"] or os.getenv("HUGGINGFACE_API_KEY")
+            
+            # Get model configuration
+            model_config = hf_config["models"].get(model, {})
+            max_length = model_config.get("max_length", 2048)
+            
+            # Device configuration
+            device = hf_config.get("device", "auto")
+            if device == "auto":
+                device = "cuda" if torch.cuda.is_available() else "cpu"
+            
+            print(f"🔧 Loading Hugging Face model: {model} on {device}...")
+            
+            # Load tokenizer and model
+            tokenizer = AutoTokenizer.from_pretrained(
+                model,
+                token=api_key,
+                trust_remote_code=True
+            )
+            
+            # Load model with quantization for efficiency
+            model_kwargs = {
+                "token": api_key,
+                "trust_remote_code": True,
+                "device_map": device if device == "auto" else None
+            }
+            
+            if hf_config.get("load_in_4bit", True) and device != "cpu":
+                model_kwargs["load_in_4bit"] = True
+            elif hf_config.get("load_in_8bit", False) and device != "cpu":
+                model_kwargs["load_in_8bit"] = True
+            
+            hf_model = AutoModelForCausalLM.from_pretrained(
+                model,
+                **model_kwargs
+            )
+            
+            # Create pipeline
+            pipe = pipeline(
+                "text-generation",
+                model=hf_model,
+                tokenizer=tokenizer,
+                max_new_tokens=max_length,
+                temperature=temperature,
+                do_sample=True,
+                top_p=0.95,
+                repetition_penalty=1.1
+            )
+            
+            # Create LangChain wrapper
+            llm = HuggingFacePipeline(pipeline=pipe)
+            
+            print(f"🤖 Using Hugging Face model: {model} for website {website_id or 'global'}")
+            return llm, "huggingface"
+            
+        except Exception as e:
+            print(f"Failed to initialize Hugging Face for {website_id}: {e}")
+            print(f"Error details: {str(e)}")
+            # Try using Hugging Face Inference API as fallback
+            try:
+                from langchain_huggingface import HuggingFaceEndpoint
+                
+                if not api_key:
+                    print("⚠️ No Hugging Face API key found. Please set HUGGINGFACE_API_KEY.")
+                    return create_mock_llm(), "mock"
+                
+                llm = HuggingFaceEndpoint(
+                    repo_id=model,
+                    temperature=temperature,
+                    huggingfacehub_api_token=api_key,
+                    max_new_tokens=model_config.get("max_length", 2048)
+                )
+                print(f"🤖 Using Hugging Face Inference API: {model} for website {website_id or 'global'}")
+                return llm, "huggingface-api"
+                
+            except Exception as api_error:
+                print(f"Failed to use Hugging Face Inference API: {api_error}")
+                return create_mock_llm(), "mock"
     
     return create_mock_llm(), "mock"
 
