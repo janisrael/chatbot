@@ -865,6 +865,9 @@
                         <button class="provider-tab" id="globalOllamaTab" onclick="selectGlobalProvider('ollama')">
                             Ollama (Local)
                         </button>
+                        <button class="provider-tab" id="globalHuggingfaceTab" onclick="selectGlobalProvider('huggingface')">
+                            Hugging Face
+                        </button>
                     </div>
 
                     <!-- OpenAI Configuration -->
@@ -890,6 +893,7 @@
                                 <select id="globalProvider" class="form-control">
                                     <option value="openai">OpenAI</option>
                                     <option value="ollama">Ollama</option>
+                                    <option value="huggingface">Hugging Face</option>
                                 </select>
                             </div>
                         </div>
@@ -915,6 +919,53 @@
                         </div>
                     </div>
 
+                            <!-- Hugging Face Configuration -->
+        <div class="provider-config" id="globalHuggingfaceConfig">
+            <div class="config-row">
+                <div class="form-group">
+                    <label for="globalHuggingfaceDefaultModel">Default Model</label>
+                    <select id="globalHuggingfaceDefaultModel" class="form-control">
+                        <option value="gpt2">GPT-2 (General Purpose)</option>
+                        <option value="distilgpt2">DistilGPT-2 (Fast & Light)</option>
+                        <option value="microsoft/DialoGPT-small">DialoGPT Small (Conversational)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="globalHuggingfaceMaxLength">Max Length</label>
+                    <input type="number" id="globalHuggingfaceMaxLength" class="form-control"
+                           value="1000" min="100" max="2000" step="100">
+                </div>
+            </div>
+            <div class="alert alert-info" style="margin-top: 10px;">
+                <small>💡 Hugging Face models run locally and may take time to download on first use.</small>
+            </div>
+        </div>
+        
+        <!-- Personality Configuration -->
+        <div class="provider-config" id="personalityConfig">
+            <h4>🎭 Bot Personality Settings</h4>
+            <div class="config-row">
+                <div class="form-group">
+                    <label for="defaultPersonality">Default Personality</label>
+                    <select id="defaultPersonality" class="form-control">
+                        <option value="friendly">🤗 Friendly - Warm and encouraging</option>
+                        <option value="professional">💼 Professional - Efficient and precise</option>
+                        <option value="casual">😎 Casual - Relaxed and conversational</option>
+                        <option value="enthusiastic">🎉 Enthusiastic - Energetic and motivating</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="personalityDescription">Description</label>
+                    <div id="personalityDescription" class="form-control-static">
+                        <small>Choose how your chatbot should interact with users</small>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info" style="margin-top: 10px;">
+                <small>💡 Personality affects greeting style, response tone, and conversation flow</small>
+            </div>
+        </div>
+
                     <button class="btn" onclick="saveGlobalConfig()" id="saveGlobalBtn">
                         💾 Save Global Settings
                     </button>
@@ -932,6 +983,7 @@
                                 <option value="">Use Global Default</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="ollama">Ollama</option>
+                                <option value="huggingface">Hugging Face</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -1498,6 +1550,10 @@ window.addEventListener('aiChatClosed', function() {
                         base_url: 'http://localhost:11434',
                         default_model: 'llama3.1:8b'
                     },
+                    huggingface: {
+                        default_model: 'gpt2',
+                        max_length: 1000
+                    },
                     effective_provider: 'openai',
                     effective_model: 'gpt-4o-mini',
                     website_overrides: {}
@@ -1505,10 +1561,67 @@ window.addEventListener('aiChatClosed', function() {
                 
                 populateLLMConfig();
                 updateLLMStatus();
+                
+                // Load personality settings
+                loadPersonalitySettings();
             } catch (error) {
                 console.error('Failed to load LLM config:', error);
                 showAlert('llmError', 'Failed to load LLM configuration');
             }
+        }
+        
+        // Load personality settings
+        function loadPersonalitySettings() {
+            fetch('/api/personality?user_id=default')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.personality) {
+                        document.getElementById('defaultPersonality').value = data.personality;
+                        updatePersonalityDescription(data.personality);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading personality settings:', error);
+                });
+        }
+        
+        // Update personality description
+        function updatePersonalityDescription(personality) {
+            const descriptions = {
+                'friendly': '🤗 Warm, encouraging, patient, and empathetic. Great for customer service.',
+                'professional': '💼 Efficient, precise, clear, and organized. Perfect for business use.',
+                'casual': '😎 Relaxed, conversational, fun, and approachable. Ideal for casual chats.',
+                'enthusiastic': '🎉 Energetic, positive, motivating, and excited. Great for learning and motivation.'
+            };
+            
+            document.getElementById('personalityDescription').innerHTML = 
+                `<small>${descriptions[personality] || 'Choose how your chatbot should interact with users'}</small>`;
+        }
+        
+        // Save personality settings
+        function savePersonalitySettings(personality) {
+            fetch('/api/personality', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: 'default',
+                    personality: personality
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('personalitySuccess', `Personality updated to ${personality}!`);
+                } else {
+                    showAlert('personalityError', 'Failed to update personality');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving personality:', error);
+                showAlert('personalityError', 'Failed to update personality');
+            });
         }
 
         function populateLLMConfig() {
@@ -1522,10 +1635,14 @@ window.addEventListener('aiChatClosed', function() {
                 const openaiModel = document.getElementById('globalOpenaiDefaultModel');
                 const ollamaUrl = document.getElementById('globalOllamaUrl');
                 const ollamaModel = document.getElementById('globalOllamaDefaultModel');
+                const huggingfaceModel = document.getElementById('globalHuggingfaceDefaultModel');
+                const huggingfaceMaxLength = document.getElementById('globalHuggingfaceMaxLength');
                 
                 if (openaiModel) openaiModel.value = llmConfig.openai.default_model || 'gpt-4o-mini';
                 if (ollamaUrl) ollamaUrl.value = llmConfig.ollama?.base_url || 'http://localhost:11434';
                 if (ollamaModel) ollamaModel.value = llmConfig.ollama?.default_model || 'llama3.1:8b';
+                if (huggingfaceModel) huggingfaceModel.value = llmConfig.huggingface?.default_model || 'microsoft/DialoGPT-medium';
+                if (huggingfaceMaxLength) huggingfaceMaxLength.value = llmConfig.huggingface?.max_length || 1000;
             }
             
             // Website-specific overrides
@@ -1548,9 +1665,18 @@ window.addEventListener('aiChatClosed', function() {
                 if (websiteTemp) websiteTemp.value = '';
             }
             
-            // Update global provider tabs
-            selectGlobalProvider(llmConfig.global_provider || 'openai');
+                    // Update global provider tabs
+        selectGlobalProvider(llmConfig.global_provider || 'openai');
+        
+        // Add personality selector event listener
+        const personalitySelector = document.getElementById('defaultPersonality');
+        if (personalitySelector) {
+            personalitySelector.addEventListener('change', function() {
+                updatePersonalityDescription(this.value);
+                savePersonalitySettings(this.value);
+            });
         }
+    }
 
         function selectGlobalProvider(provider) {
             // Update tabs
@@ -1586,6 +1712,10 @@ window.addEventListener('aiChatClosed', function() {
                     ollama: {
                         base_url: document.getElementById('globalOllamaUrl')?.value,
                         default_model: document.getElementById('globalOllamaDefaultModel')?.value
+                    },
+                    huggingface: {
+                        default_model: document.getElementById('globalHuggingfaceDefaultModel')?.value,
+                        max_length: parseInt(document.getElementById('globalHuggingfaceMaxLength')?.value) || 1000
                     }
                 };
                 

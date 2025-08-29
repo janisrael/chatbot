@@ -1,0 +1,18 @@
+{
+  "datasets": {
+    "conversational": {
+      "path": "data/conversational/conversations.json",
+      "description": "Conversational exchanges for natural dialogue",
+      "count": 100,
+      "type": "conversation"
+    },
+    "reasoning": {
+      "path": "data/reasoning/reasoning_problems.json",
+      "description": "Math and reasoning problems for logical thinking",
+      "count": 500,
+      "type": "reasoning"
+    }
+  },
+  "total_datasets": 2,
+  "last_updated": null
+}

@@ -1,14 +1,22 @@
-# from flask import Flask, request, jsonify, render_template, session, send_from_directory
-# from flask_cors import CORS
-# import os
-# from datetime import datetime
-# import re
-# import shutil
-# import json
-# import time
+from flask import Flask, request, jsonify, render_template, session, send_from_directory
+from flask_cors import CORS
+import os
+from datetime import datetime
+import re
+import shutil
+import json
+import time
 
-# import mysql.connector
-# from db_config import DB_CONFIG
+import mysql.connector
+from db_config import DB_CONFIG
+
+# Import conversation memory system
+try:
+    from conversation_memory import ConversationMemory
+    CONVERSATION_MEMORY_AVAILABLE = True
+except ImportError:
+    CONVERSATION_MEMORY_AVAILABLE = False
+    print("⚠️ Conversation memory system not available. Install with: python3 improve_conversations.py")
 
 # # Updated imports for dashboard functionality
 # try:
@@ -31,7 +39,15 @@
 # CORS(app)
 
 # # Create upload directory
-# os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize conversation memory system
+if CONVERSATION_MEMORY_AVAILABLE:
+    conversation_memory = ConversationMemory()
+    print("✅ Conversation memory system initialized")
+else:
+    conversation_memory = None
+    print("⚠️ Running without conversation memory system")
 
 # # Allowed file extensions
 # ALLOWED_EXTENSIONS = {'txt', 'pdf', 'doc', 'docx', 'csv'}
@@ -1710,6 +1726,14 @@ def load_llm_config():
             },
             "default_model": "llama3.1:8b"
         },
+        "huggingface": {
+            "models": {
+                "gpt2": {"temperature": 0.7, "max_length": 1000},
+                "distilgpt2": {"temperature": 0.8, "max_length": 1000},
+                "microsoft/DialoGPT-small": {"temperature": 0.9, "max_length": 1000}
+            },
+            "default_model": "gpt2"
+        },
         "website_overrides": {}  # Per-website LLM configurations
     }
     
@@ -1877,6 +1901,49 @@ def create_llm_instance(website_id=None):
             
         except Exception as e:
             print(f"Failed to initialize Ollama for {website_id}: {e}")
+            return create_mock_llm(), "mock"
+    
+    elif provider == "huggingface":
+        try:
+            from langchain_community.llms import HuggingFacePipeline
+            from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+            import torch
+            
+            # Get model configuration
+            model_config = effective_config["config"]["huggingface"]["models"][model]
+            max_length = model_config.get("max_length", 1000)
+            
+            # Load tokenizer and model
+            tokenizer = AutoTokenizer.from_pretrained(model)
+            model_instance = AutoModelForCausalLM.from_pretrained(
+                model,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                device_map="auto" if torch.cuda.is_available() else None,
+                low_cpu_mem_usage=True
+            )
+            
+            # Create pipeline
+            pipe = pipeline(
+                "text-generation",
+                model=model_instance,
+                tokenizer=tokenizer,
+                max_length=max_length,
+                temperature=temperature,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id
+            )
+            
+            # Create LangChain wrapper
+            llm = HuggingFacePipeline(
+                pipeline=pipe,
+                model_kwargs={"temperature": temperature}
+            )
+            
+            print(f"🤖 Using Hugging Face model: {model} for website {website_id or 'global'}")
+            return llm, "huggingface"
+            
+        except Exception as e:
+            print(f"Failed to initialize Hugging Face model {model} for {website_id}: {e}")
             return create_mock_llm(), "mock"
     
     return create_mock_llm(), "mock"
@@ -2287,13 +2354,37 @@ def get_website_config_api():
     
     config = WEBSITE_CONFIGS[website_id]
     
-    return jsonify({
-        'websiteId': website_id,
-        'botName': config.get('bot_name', 'Assistant'),
-        'primaryColor': config.get('primary_color', '#667eea'),
-        'websiteName': config.get('name', 'Website'),
-        'features': config.get('features', [])
-    })
+            return jsonify({
+            'websiteId': website_id,
+            'botName': config.get('bot_name', 'Assistant'),
+            'primaryColor': config.get('primary_color', '#667eea'),
+            'websiteName': config.get('name', 'Website'),
+            'features': config.get('features', [])
+        })
+
+@app.route("/api/personality", methods=["GET", "POST"])
+def manage_personality():
+    """Get or set user personality preference"""
+    if not conversation_memory:
+        return jsonify({"error": "Conversation memory system not available"}), 503
+    
+    try:
+        if request.method == "GET":
+            user_id = request.args.get("user_id", "default")
+            personality = conversation_memory.get_user_personality(user_id)
+            return jsonify({"user_id": user_id, "personality": personality})
+        
+        elif request.method == "POST":
+            data = request.json
+            user_id = data.get("user_id", "default")
+            personality = data.get("personality", "friendly")
+            
+            conversation_memory.set_user_personality(user_id, personality)
+            return jsonify({"success": True, "user_id": user_id, "personality": personality})
+    
+    except Exception as e:
+        print(f"Error managing personality: {e}")
+        return jsonify({"error": "Failed to manage personality"}), 500
 
 # Website management endpoints
 @app.route("/api/websites", methods=["GET"])
@@ -2337,13 +2428,25 @@ def chat_multi():
         bot_name = website_config.get('bot_name', 'Assistant')
         website_name = website_config.get('name', 'Website')
         
+        # Get conversation context if memory system is available
+        conversation_context = ""
+        if conversation_memory:
+            conversation_context = conversation_memory.get_conversation_context(user_id)
+        
+        # Enhanced query with conversation context
         enhanced_query = (
             f"You are {bot_name}, a friendly assistant at {website_name}. "
             f"You are helping a user named {name}. "
             f"Always answer in raw HTML (e.g., <br>, <ul>), no Markdown. "
             f"Always end your message with a helpful follow-up question. "
-            f"Question: {user_input}"
+            f"Be conversational and natural, not robotic. "
+            f"Vary your responses and don't repeat the same phrases. "
         )
+        
+        if conversation_context:
+            enhanced_query += f"\n\nPrevious conversation context:\n{conversation_context}\n\n"
+        
+        enhanced_query += f"Current question: {user_input}"
 
         # Use the QA chain to get response
         if qa_chain and hasattr(llm, 'invoke'):
@@ -2368,6 +2471,13 @@ def chat_multi():
         # Log the conversation with website context
         log_chat(user_id, user_input, "user", website_id)
         log_chat(user_id, reply, "bot", website_id)
+        
+        # Track conversation in memory system if available
+        if conversation_memory:
+            try:
+                conversation_memory.add_turn(user_id, user_input, reply)
+            except Exception as e:
+                print(f"Warning: Could not update conversation memory: {e}")
         
         return jsonify({"response": reply, "website_id": website_id})
 
